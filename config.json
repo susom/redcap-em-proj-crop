@@ -1,0 +1,76 @@
+{
+	"name": "Project CROP",
+
+	"namespace": "Stanford\\ProjCROP",
+
+	"description": "EM supporting CROP project",
+
+	"documentation": "README.md",
+
+	"authors": [
+		{
+			"name": "Jae Lee",
+			"email": "jael@stanford.edu",
+			"institution": "Stanford University"
+		}
+	],
+
+	"permissions": [
+		"redcap_save_record"
+	],
+
+	"crons": [
+		{
+			"cron_name": "crop_notification",
+			"cron_description": "Cron that runs everyday to send status changed notifications to learners and admins",
+			"method": "cropNotifyCron",
+			"cron_frequency": "3600",
+			"cron_max_run_time": "300"
+		}
+	],
+
+	"links": {
+		"project": [
+			{
+				"name": "CROP: Landing Page",
+				"icon": "gear",
+				"url": "src/landing.php"
+			},
+			{
+				"name": "CROP: Test Cron Links",
+				"icon": "gear",
+				"url": "src/DisplayCronLinks.php"
+			}
+		],
+		"control-center": [
+		]
+	},
+
+	"no-auth-pages": [
+		"src/landing"
+	],
+
+	"system-settings": [
+		{
+			"key": "enable-system-debug-logging",
+			"name": "<b>Enable Debug Logging (system-wide)</b><i>(Requires emLogger)</i>",
+			"required": false,
+			"type": "checkbox"
+		}
+	],
+
+	"project-settings": [
+		{
+			"key": "enable-project-debug-logging",
+			"name": "<b>Enable Debug Logging</b> <i>(Requires emLogger)</i>",
+			"required": false,
+			"type": "checkbox"
+		}
+	],
+	"compatibility": {
+		"php-version-min": "",
+		"php-version-max": "",
+		"redcap-version-min": "",
+		"redcap-version-max": ""
+	}
+}
