@@ -65,6 +65,96 @@
 			"name": "<b>Enable Debug Logging</b> <i>(Requires emLogger)</i>",
 			"required": false,
 			"type": "checkbox"
+		},
+		{
+			"key": "exam-date-form",
+			"name": "<b>Exam Form</b><br>Select Form where exam dates are saved",
+			"required": false,
+			"type": "form-list"
+		},
+		{
+			"key": "date-exam-1-field",
+			"name": "<b>First Exam Date Field</b><br>Select Field for first exam date",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "exam-status-1-field",
+			"name": "<b>First Exam Status Field</b><br>Select Field for first exam status",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "date-exam-2-field",
+			"name": "<b>Second Exam Date Field</b><br>Select Field for SECOND exam date",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "exam-status-2-field",
+			"name": "<b>Second Exam Status Field</b><br>Select Field for SECOND exam status",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "date-exam-3-field",
+			"name": "<b>Third Exam Date Field</b><br>Select Field for THIRD exam date",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "exam-status-3-field",
+			"name": "<b>Third Exam Status Field</b><br>Select Field for THIRD exam status",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "final-exam-date-field",
+			"name": "<b>Final Exam Date field</b><br>Select field for the Final Exam Date",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "expiry-date-field",
+			"name": "<b>Expiry Date field</b><br>Select field for the Expiry Date",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "final-exam-to-expiry-offset",
+			"name": "<b>Offset from Final Exam Date to Expiry Date</b><br>What is the number of days between Final Exam and Expiration?",
+			"required": false,
+			"type": "text"
+		},
+		{
+			"key": "fup-survey-6-mo-field",
+			"name": "<b>Six Month Followup Date field</b><br>Select field for the followup survey date 6 months AFTER the last exam date",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "fup-survey-1-yr-field",
+			"name": "<b>One Year Followup Date field</b><br>Select field for the followup survey date 1 year AFTER the last exam date",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "rem-expiry-6-mo-field",
+			"name": "<b>Six Month Expiry Reminder Date Field</b><br>Select field for the 6 month expiry reminder date",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "rem-expiry-1-mo-field",
+			"name": "<b>One Month Expiry Reminder Date Field</b><br>Select field for the 1 month expiry reminder date",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "grace-pd-30-day-field",
+			"name": "<b>30 Day Grace Period Date Field</b><br>Select field for the 30 day Grace Period date",
+			"required": false,
+			"type": "field-list"
 		}
 	],
 	"compatibility": {

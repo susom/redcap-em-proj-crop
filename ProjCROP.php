@@ -4,6 +4,8 @@ namespace Stanford\ProjCROP;
 
 use ExternalModules\ExternalModules;
 use REDCap;
+use DateTime;
+use DateInterval;
 
 require_once 'emLoggerTrait.php';
 
@@ -38,6 +40,26 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
     "elective_4_date"
     );
 
+    public function redcap_save_record($project_id, $record = NULL, $instrument, $event_id, $group_id = NULL, $survey_hash = NULL, $response_id = NULL, $repeat_instance) {
+        //On save of exam date, set the dates for expiration and notifications
+        //if form is admin_exam_dates_and_status
+        if ($instrument == $this->getProjectSetting('exam-date-form')) {
+            //getData for populated fields
+            $final_date = $this->getExamData($record, $event_id,$repeat_instance);
+
+            if ($final_date === false) {
+                $this->emDebug("No update needed.");
+                return;
+            }
+
+            $this->updateEndDate($record, $final_date, $event_id, $repeat_instance);
+
+        }
+
+
+    }
+
+
     /**
      * Upon completion of
      *
@@ -61,6 +83,132 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
     }
 
     /******************************************/
+
+
+    /**
+     * Retrieve the fields entered in the admin_expiry_and followup page to be copied over to the expiry form
+     *
+     * @param $record
+     * @param $event
+     * @return array|bool
+     */
+    function getExamData($record, $event,$repeat_instance) {
+
+        $final_exam_date_field          = $this->getProjectSetting('final-exam-date-field');
+        $date_exam_1_field              = $this->getProjectSetting('date-exam-1-field');
+        $exam_status_1_field            = $this->getProjectSetting('exam-status-1-field');
+        $date_exam_2_field              = $this->getProjectSetting('date-exam-2-field');
+        $exam_status_2_field            = $this->getProjectSetting('exam-status-2-field');
+        $date_exam_3_field              = $this->getProjectSetting('date-exam-3-field');
+        $exam_status_3_field            = $this->getProjectSetting('exam-status-3-field');
+
+        $params = array(
+            'return_format'       => 'json',
+            'records'             => $record,
+            'fields'              => array($final_exam_date_field,$date_exam_1_field, $exam_status_1_field,$date_exam_2_field,$exam_status_2_field,
+                $date_exam_3_field,$exam_status_3_field),
+            'events'              => $event,
+//                'redcap_repeat_instrument' => $instrument,       //this doesn't restrict
+            'redcap_repeat_instance'   => $repeat_instance   //this doesn't seem to do anything!
+        );
+
+        $q = REDCap::getData($params);
+        $results = json_decode($q, true);
+
+        //$this->emDebug($params,$results, count(array_filter($results[0])));
+
+        //nothing set, do nothing,  we are done return false
+        if (count(array_filter($results[0])) < 1) {
+            return false;
+        }
+
+        //if final_exam_date_field is populated, do nothing, return false
+        if (!empty($results[0][$final_exam_date_field])) {
+            $this->emDebug("Final exam date already set. Do nothing",$results[0][$final_exam_date_field]);
+            return false;
+        }
+
+        //$this->emDebug($results[0][$exam_status_1_field],$results[0][$exam_status_2_field],$results[0][$exam_status_3_field]);
+        //$this->emDebug($results[0][$date_exam_1_field],$results[0][$date_exam_2_field],$results[0][$date_exam_3_field]);
+
+        $final_exam_date = '';
+        if (($results[0][$exam_status_1_field]!=='1') && ($results[0][$exam_status_2_field]!=='1') && ($results[0][$exam_status_3_field]!=='1')) {
+            $this->emDebug("Exam not passed. Do nothing");
+            return false;
+        } else {
+            for($i=3; $i>0; $i--) {
+                if ($results[0][${"exam_status_".$i."_field"}]=='1') {
+                    $final_exam_date = $results[0][${"date_exam_".$i."_field"}];
+                    break;
+                }
+            }
+
+            $this->emDebug("FINAL Exam date is $final_exam_date");
+
+        }
+
+        return $final_exam_date;
+
+    }
+
+
+    /**
+     * Given a start_date and and offset, set the end_date into the target_field
+     *
+     * @param $record
+     * @param $start_date
+     * @param $offset
+     * @param $target_field
+     * @param $target_event
+     */
+    function updateEndDate($record, $exam_date, $target_event, $repeat_instance) {
+
+        $this->emDebug("Updating end date for $record ", $exam_date);
+
+        if (!empty($exam_date)) {
+
+            //save the date
+            $data = array(
+                REDCap::getRecordIdField()                             => $record,
+                'redcap_event_name'                                    => REDCap::getEventNames(true, false,$target_event),
+                'redcap_repeat_instance'                               => $repeat_instance,
+                $this->getProjectSetting('final-exam-date-field') => $exam_date
+            );
+
+            $expiry_date = $this->getOffsetDate($exam_date,$this->getProjectSetting('final-exam-to-expiry-offset'));
+            $data[$this->getProjectSetting('expiry-date-field')] =$expiry_date;
+            $data[$this->getProjectSetting('fup-survey-6-mo-field')] = $this->getOffsetDate($exam_date,180);
+            $data[$this->getProjectSetting('fup-survey-1-yr-field')] = $this->getOffsetDate($exam_date,365);
+
+            $data[$this->getProjectSetting('rem-expiry-6-mo-field')] = $this->getOffsetDate($expiry_date,-180);
+            $data[$this->getProjectSetting('rem-expiry-1-mo-field')] = $this->getOffsetDate($expiry_date,-30);
+            $data[$this->getProjectSetting('grace-pd-30-day-field')] = $this->getOffsetDate($expiry_date,30);
+
+            REDCap::saveData($data);
+            $response = REDCap::saveData('json', json_encode(array($data)));
+
+            if ($response['errors']) {
+                $msg = "Error while trying to save dates.";
+                $this->emError($response['errors'], $data, $msg);
+            } else {
+                $this->emDebug("Successfully saved date data.");
+            }
+        }
+    }
+
+    function getOffsetDate($start_date, $offset) {
+        $this->emDebug("Start date is $start_date with $offset");
+        $end_date = new DateTime($start_date);
+        $di = new DateInterval('P'.abs($offset).'D');
+
+        if ($offset < 0) {
+            $di->invert = 1; // Proper negative date interval
+        }
+        $end_date->add($di);
+        //$this->emDebug("Start date is $start_date with $offset . and end date ".$end_date->format('Y-m-d'));
+        return $end_date->format('Y-m-d');
+    }
+
 
     public function findRecordFromSUNet($id) {
         global $module;
