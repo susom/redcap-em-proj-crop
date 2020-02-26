@@ -67,6 +67,18 @@
 			"type": "checkbox"
 		},
 		{
+			"key": "application-event",
+			"name": "<b>Application Event</b><br>Select Event of the Application form",
+			"required": false,
+			"type": "event-list"
+		},
+		{
+			"key": "exam-event",
+			"name": "<b>Seminar / Traininge Event</b><br>Select Event of the Seminars / Training form",
+			"required": false,
+			"type": "event-list"
+		},
+		{
 			"key": "exam-date-form",
 			"name": "<b>Exam Form</b><br>Select Form where exam dates are saved",
 			"required": false,

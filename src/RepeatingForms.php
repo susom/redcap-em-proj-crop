@@ -1,8 +1,9 @@
 <?php
 namespace Stanford\ProjCROP;
 
-use \REDCap;
-use \Project;
+use Project;
+use REDCap;
+
 //use \Records;
 
 /*
@@ -52,45 +53,52 @@ will vary.
 class RepeatingForms
 {
     // Metadata
-    private $Proj;
+    protected $Proj;
     private $pid;
     private $is_longitudinal;
     private $data_dictionary;
     private $fields;
-    private $events_enabled = array();    // Array of event_ids where the instrument is enabled
+    protected $events_enabled = array();    // Array of event_ids where the instrument is enabled
     private $instrument;
 
     // Instance
     private $event_id;
     private $data;
     private $data_loaded = false;
+    private $dirty = true;
     private $record_id;
 
     // Last error message
     public $last_error_message = null;
 
-    public function __construct($pid, $instrument_name)
+    public function __construct($pid)
     {
         global $Proj, $module;
 
         if ($Proj->project_id == $pid) {
             $this->Proj = $Proj;
-
         } else {
             $this->Proj = new Project($pid);
-
         }
-
 
         if (empty($this->Proj) or ($this->Proj->project_id != $pid)) {
             $this->last_error_message = "Cannot determine project ID in RepeatingForms";
         }
         $this->pid = $pid;
 
+
         // Find the fields on this repeating instrument
         $this->instrument = $instrument_name;
-        $this->data_dictionary = REDCap::getDataDictionary($pid, 'array', false, null, array($instrument_name));
+
+        if ($instrument_name === null) {
+            $this->data_dictionary = REDCap::getDataDictionary($pid, 'array', false, null);
+
+        } else {
+            $this->data_dictionary = REDCap::getDataDictionary($pid, 'array', false, null, array($instrument_name));
+        }
+
         $this->fields = array_keys($this->data_dictionary);
+
 
         // Is this project longitudinal?
         $this->is_longitudinal = $this->Proj->longitudinal;
@@ -111,7 +119,91 @@ class RepeatingForms
                 array_push($this->events_enabled, $event);
             }
         }
+
     }
+
+    public static function byForm($pid, $instrument_name) {
+        $instance = new self($pid);
+        // Find the fields on this repeating instrument
+        $instance->instrument = $instrument_name;
+        $instance->data_dictionary = REDCap::getDataDictionary($pid, 'array', false, null, array($instrument_name));
+        $instance->fields = array_keys($instance->data_dictionary);
+
+        // Is this project longitudinal?
+        $instance->is_longitudinal = $instance->Proj->longitudinal;
+
+        // If this is not longitudinal, retrieve the event_id
+        if (!$instance->is_longitudinal) {
+            $instance->event_id = array_keys($instance->Proj->eventInfo)[0];
+        }
+
+        // Retrieved events
+        $all_events = $instance->Proj->getRepeatingFormsEvents();
+
+        //TODO: make sure this works if form is enable in multiple events (not repeating everywhere)
+        // See which events have this form enabled
+        foreach (array_keys($all_events) as $event) {
+            $fields_in_event = REDCap::getValidFieldsByEvents($instance->pid, $event, false);
+            $field_intersect = array_intersect($fields_in_event, $instance->fields);
+            if (isset($field_intersect) && sizeof($field_intersect) > 0) {
+                array_push($instance->events_enabled, $event);
+            }
+        }
+
+        return $instance;
+
+    }
+
+    public static function byEvent($pid, $event) {
+        global $module;
+
+        $instance = new self($pid);
+
+        $all_events = $instance->Proj->getRepeatingFormsEvents();
+        //$module->emDebug($all_events);
+
+
+        // Is this project longitudinal?
+        $instance->is_longitudinal = $instance->Proj->longitudinal;
+
+        // If this is not longitudinal, retrieve the event_id
+        if (!$instance->is_longitudinal) {
+            $instance->event_id = array_keys($instance->Proj->eventInfo)[0];
+        } else {
+            $instance->event_id = $event;
+        }
+
+        // Retrieved events
+        $all_events = $instance->Proj->getRepeatingFormsEvents();
+
+
+
+        // Find the fields on this repeating event
+        $fields_in_event = REDCap::getValidFieldsByEvents($pid, $event, false);
+        //$module->emDebug($fields_in_event);
+
+        //only get datadictionary for field in events
+        $instance->data_dictionary = REDCap::getDataDictionary($pid, 'array', false, $fields_in_event);
+        $instance->fields = array_keys($instance->data_dictionary);
+        //$module->emDebug($instance->fields);
+
+        //just set the the events_enabled to this event
+        array_push($instance->events_enabled, $event);
+
+
+        /**
+        // See which events have this form enabled
+        foreach (array_keys($all_events) as $event) {
+            $fields_in_event = REDCap::getValidFieldsByEvents($instance->pid, $event, false);
+            $field_intersect = array_intersect($fields_in_event, $instance->fields);
+            if (isset($field_intersect) && sizeof($field_intersect) > 0) {
+                array_push($instance->events_enabled, $event);
+            }
+        }
+*/
+        return $instance;
+    }
+
 
     /**
      * This function will load data internally from the database using the record, event and optional
@@ -126,6 +218,8 @@ class RepeatingForms
      */
     public function loadData($record_id, $event_id=null, $filter=null)
     {
+        global $module;
+
         $this->record_id = $record_id;
         if (!is_null($event_id)) {
             $this->event_id = $event_id;
@@ -149,6 +243,40 @@ class RepeatingForms
         }
 
         $this->data_loaded = true;
+        $this->dirty = false;
+
+    }
+
+
+
+    /**
+     *
+     * @param $record_id
+     * @param null $event_id
+     * @param null $filter
+     * @return None
+     */
+    public function checkRecordExistsWithFilter($record_id, $event_id=null, $filter=null)
+    {
+        global $module;
+        $found = false;
+        $module->emDebug($record_id, $event_id, $filter);
+
+        $this->record_id = $record_id;
+        if (!is_null($event_id)) {
+            $this->event_id = $event_id;
+        }
+
+        // Filter logic will only return matching instances
+        $return_format = 'array';
+        $repeating_forms = REDCap::getData($this->pid, $return_format, array($record_id), $this->fields, $this->event_id, NULL, false, false, false, $filter, true);
+
+        $module->emDebug($repeating_forms);
+
+        //if empty then return false
+
+        // else already exists, return true;
+        return false;
     }
 
     /**
@@ -267,25 +395,33 @@ class RepeatingForms
      * @return int | false (If an error occurs)
      */
     public function getLastInstanceId($record_id, $event_id=null) {
+        global $module;
 
+        $module->emDebug("Location last instance id for record $record_id and event $event_id");
         if ($this->is_longitudinal && is_null($event_id)) {
             $this->last_error_message = "You must supply an event_id for longitudinal projects in " . __FUNCTION__;
+            $module->emError($this->last_error_message);
             return false;
         } else if (!$this->is_longitudinal) {
             $event_id = $this->event_id;
         }
 
         // Check to see if we have the correct data loaded.
-        if ($this->data_loaded == false || $this->record_id != $record_id || $this->event_id != $event_id) {
+        //todo as leeann about forcing reload
+        if ($this->data_loaded == false || $this->record_id != $record_id || $this->event_id != $event_id || $this->dirty == true) {
+            //doesn't this need to be reloaded to get the latest
             $this->loadData($record_id, $event_id, null);
         }
-
+        $module->emDebug("Longitudinal  is ". $this->is_longitudinal);
         // If the record_ids (and optionally event_ids) match, return the data.
         if ($this->is_longitudinal) {
             $size = sizeof($this->data[$record_id][$event_id]);
+            $module->emDebug("SIZE is $size");
             if ($size < 1) {
-                $this->last_error_message = "There are no instances in event $event_id for record $record_id " . __FUNCTION__;
-                return false;
+                //todo ask lee ann: not an error? this will prompt return of 1 as first instance
+                //$this->last_error_message = "There are no instances in event $event_id for record $record_id " . __FUNCTION__;
+                //return false;  //shouldn't this return null so that it starts with 1? (line 423);
+                return null;
             } else {
                 return array_keys($this->data[$record_id][$event_id])[$size - 1];
             }
@@ -293,6 +429,7 @@ class RepeatingForms
             $size = sizeof($this->data[$record_id]);
             if ($size < 1) {
                 $this->last_error_message = "There are no instances for record $record_id " . __FUNCTION__;
+                $module->emDebug($this->last_error_message);
                 return false;
             } else {
                 return array_keys($this->data[$record_id])[$size - 1];
@@ -300,8 +437,35 @@ class RepeatingForms
         }
     }
 
+    /**
+     *
+     * @param $record
+     * @param $event
+     * @return int|mixed
+     */
+    public function getNextInstanceIDForceReload($record, $event) {
+        global $module;
+
+        //getData for all surveys for this record
+
+        //$get_data = array('redcap_repeat_instance');
+        $params = array(
+            'return_format'       => 'json',
+            //'fields'              => $get_data, //we need to leave this open in order to get the instance id
+            'records'             => $record,
+            'events'              => $event
+        );
+        $q = REDCap::getData($params);
+        $results = json_decode($q, true);
+
+        $max_id = max(array_column($results, 'redcap_repeat_instance'));
+
+        return $max_id + 1;
+    }
+
 
     /**
+     * FIXME: this sometimes give stale ID. temp fix add another method which force loads data again
      * This function will return the next instance_id in the sequence that does not currently exist.
      * If there are no current instances, it will return 1.
      *
@@ -309,8 +473,9 @@ class RepeatingForms
      * @param null $event_id
      * @return int | false (if an error occurs)
      */
-    public function getNextInstanceId($record_id, $event_id=null)
-    {
+    public function getNextInstanceId($record_id, $event_id=null) {
+        global $module;
+
         // If this is a longitudinal project, the event_id must be supplied.
         if ($this->is_longitudinal && is_null($event_id)) {
             $this->last_error_message = "You must supply an event_id for longitudinal projects in " . __FUNCTION__;
@@ -321,6 +486,7 @@ class RepeatingForms
 
         // Find the last instance and add 1 to it. If there are no current instances, return 1.
         $last_index = $this->getLastInstanceId($record_id, $event_id);
+
         if (is_null($last_index)) {
             return 1;
         } else {
@@ -343,29 +509,35 @@ class RepeatingForms
     public function saveInstance($record_id, $data, $instance_id = null, $event_id = null)
     {
         global $module;
+
         if ($this->is_longitudinal && is_null($event_id)) {
-            $this->last_error = "Event ID Required for longitudinal project in " . __FUNCTION__;
+            $this->last_error_message = "Event ID Required for longitudinal project in " . __FUNCTION__;
             return false;
         } else if (!$this->is_longitudinal) {
-            $event_id = $this->event_id;
+            //todo: ask why not use event_id passed in...
+            //$event_id = $this->event_id;
         }
 
         // If the instance ID is null, get the next one because we are saving a new instance
         if (is_null($instance_id)) {
-            $this->last_error = "Instance ID is required to save data " . __FUNCTION__;
+            $this->last_error_message = "Instance ID is required to save data " . __FUNCTION__;
             return false;
         } else {
             $next_instance_id = $instance_id;
         }
 
+        $module->emDebug("Saving repeating form rec # $record_id in event $event_id");
         // Include instance and format into REDCap expected format
         $new_instance[$record_id]['repeat_instances'][$event_id][$this->instrument][$next_instance_id] = $data;
 
         $return = REDCap::saveData($this->pid, 'array', $new_instance);
-        $module->emDebug($return);
-        if (!isset($return["errors"]) and ($return["item_count"] <= 0)) {
-            $this->last_error_message = "Problem saving instance $next_instance_id for record $record_id in project $this->pid. Returned: " . json_encode($return);
-            $module->emError($this->last_error_message);
+        $this->dirty = true; //set object as dirty to prompt reload later.
+
+//        $module->emDebug($return["errors"], $return['item_count']);
+
+        if (!empty($return["errors"]) and ($return["item_count"] <= 0)) {
+            $module->emError("Problem saving instance $next_instance_id for record $record_id in event $event_id in project $this->pid.", $return["errors"]);
+            $this->last_error_message = "Problem saving instance $next_instance_id for record $record_id in in event $event_id in project $this->pid. Returned: " . json_encode($return);
             return false;
         } else {
             return true;
@@ -379,7 +551,7 @@ class RepeatingForms
         $module->emLog("This is the pid in deleteInstance $this->pid");
         // If longitudinal and event_id = null, send back an error
         if ($this->is_longitudinal && is_null($event_id)) {
-            $this->last_error = "Event ID Required for longitudinal project in " . __FUNCTION__;
+            $this->last_error_message = "Event ID Required for longitudinal project in " . __FUNCTION__;
             return false;
         } else if (!$this->is_longitudinal) {
             $event_id = $this->event_id;
@@ -536,7 +708,7 @@ class RepeatingForms
 
         // Longitudinal projects need to supply an event_id
         if ($this->is_longitudinal && is_null($event_id)) {
-            $this->last_error = "Event ID Required for longitudinal project in " . __FUNCTION__;
+            $this->last_error_message = "Event ID Required for longitudinal project in " . __FUNCTION__;
             return false;
         } else if (!$this->is_longitudinal) {
             $event_id = $this->event_id;
@@ -573,5 +745,10 @@ class RepeatingForms
 
         return $found_instance_id;
     }
+
+    public function getInstrument() {
+        return $this->instrument;
+    }
+
 
 }

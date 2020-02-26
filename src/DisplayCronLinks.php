@@ -2,8 +2,6 @@
 
 namespace Stanford\ProjCROP;
 
-use REDCap;
-
 /** @var \Stanford\ProjCROP\ProjCROP $module */
 
 $url = $module->getUrl('src/landing.php', true, false);

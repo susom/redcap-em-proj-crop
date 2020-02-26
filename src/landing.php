@@ -4,12 +4,13 @@ namespace Stanford\ProjCROP;
 /** @var \Stanford\ProjCROP\ProjCROP $module */
 
 require_once("RepeatingForms.php");
+
 use REDCap;
 
 $module->emDebug("Starting CROP landing page for project $pid");
 
 $sunet_id = $_SERVER['WEBAUTH_USER'];
-$sunet_id = 'cat';
+//$sunet_id = 'cat';
 
 //if sunet ID not set leave
 if (!isset($sunet_id)) {
@@ -20,7 +21,7 @@ $module->emDebug($_POST);
 //look up the sunet id in the project and present the available status in the data table.
 //1. if none, create new form
 //2. If exists,
-$dem_array = $module->findRecordFromSUNet($sunet_id);
+$dem_array = $module->findRecordFromSUNet($sunet_id, $module->getProjectSetting('application-event'));
 
 $record = $dem_array[REDCap::getRecordIdField()];
 $first_name = $dem_array['first_name'];
@@ -35,8 +36,12 @@ $repeating_seminar_instrument = 'seminars_trainings';
 $rf = new RepeatingForms($pid, $repeating_seminar_instrument);
 $rf->loadData($record, null, null);
 //$data = $rf->getAllInstances($record, null);
-$last_instance = $rf->getLastInstanceId($record);
-$instance = $rf->getInstanceById($record, $last_instance, null);
+
+$exam_event = $module->getProjectSetting('exam-event');
+$last_instance = $rf->getLastInstanceId($record,$exam_event);
+$instance = $rf->getInstanceById($record, $last_instance, $exam_event);
+
+$module->emDebug("last instance id is $last_instance");
 
 //there is instance yet
 if ($last_instance === false) {
@@ -54,7 +59,7 @@ if (isset($_POST['schedule'])) {
     $schedule_data['ready_for_exam___1'] = '1';
 
     $module->emDebug($schedule_data);
-    $save_status = $rf->saveInstance($record, $schedule_data, $last_instance, null);
+    $save_status = $rf->saveInstance($record, $schedule_data, $last_instance, $exam_event);
     if ($save_status == false) {
         $module->emDebug("Error saving : ". $rf->last_error_message);
         $result = array(
@@ -81,7 +86,7 @@ if (isset($_POST['save_form'])) {
     $save_data = $module->setupSaveData($_POST['date_values'],$_POST['text_values'],  $_POST['checked_values']);
 
     $module->emDebug($save_data);
-    $save_status = $rf->saveInstance($record, $save_data, $last_instance, null);
+    $save_status = $rf->saveInstance($record, $save_data, $last_instance, $exam_event);
     if ($save_status == false) {
         $module->emDebug("Error saving : ". $rf->last_error_message);
            $result = array(

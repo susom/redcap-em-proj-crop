@@ -2,10 +2,9 @@
 
 namespace Stanford\ProjCROP;
 
-use ExternalModules\ExternalModules;
-use REDCap;
-use DateTime;
 use DateInterval;
+use DateTime;
+use REDCap;
 
 require_once 'emLoggerTrait.php';
 
@@ -22,22 +21,20 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         "st_date_ethics",
         "st_date_irb_report",
         "st_date_doc",
-    "st_date_resources",
-    "st_date_consent",
-    "st_date_irb",
-    "st_budgeting",
-    "st_date_budgeting",
-    "st_date_billing",
-    "st_date_regulatory",
-    "st_date_startup",
-    "st_date_roles",
-    "st_date_rsrch_phase",
-    "st_oncore",
-    "st_date_oncore",
-    "elective_1_date",
-    "elective_2_date",
-    "elective_3_date",
-    "elective_4_date"
+        "st_date_resources",
+        "st_date_consent",
+        "st_date_irb",
+        array("st_budgeting","st_date_budgeting"),
+        "st_date_billing",
+        "st_date_regulatory",
+        "st_date_startup",
+        "st_date_roles",
+        "st_date_rsrch_phase",
+        array("st_oncore","st_date_oncore"),
+        array("elective_1","elective_1_date"),
+       array("elective_2", "elective_2_date"),
+        array("elective_3","elective_3_date"),
+       array("elective_4", "elective_4_date")
     );
 
     public function redcap_save_record($project_id, $record = NULL, $instrument, $event_id, $group_id = NULL, $survey_hash = NULL, $response_id = NULL, $repeat_instance) {
@@ -210,12 +207,11 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
     }
 
 
-    public function findRecordFromSUNet($id) {
+    public function findRecordFromSUNet($id, $target_event = NULL) {
         global $module;
 
         //should this be parametrized?
         $target_id_field = "webauth_user";
-        $target_event = null;
         $firstname_field = "first_name";
         $lastname_field = "last_name";
         $date_start_field = "st_date_seminar_start";
@@ -237,7 +233,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         // Use alternative passing of parameters as an associate array
         $params = array(
             'return_format' => 'json',
-        //    'events'        =>  $target_event,
+            'events'        =>  $target_event,
             'fields'        => array( REDCap::getRecordIdField(), $firstname_field, $lastname_field),
             'filterLogic'   => $filter
         );
@@ -260,30 +256,42 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         //$this->emDebug($instance);
 
         foreach ($this->portal_fields as $field) {
-            $field_label = $dict[$field]['field_label'];
-            $field_value = $instance[$field];
 
-            if ($dict[$field]['field_type'] === 'dropdown') {
-                $field_choices = "<option value='' selected disabled>{$field_label}</option>";
-                foreach (explode("|",$dict[$field]['select_choices_or_calculations']) as $choice) {
-                    $choice_parts = explode(",", $choice);
-                    $field_choices .= "<option value='{$choice_parts[0]}'>{$choice_parts[1]}</option>";
-                }
 
-                $field_choices .= "</select></div>";
-                $field_label = "<div class='form-group col-md-8'>
-                          <select id='{$field}' class='form-control'>
+            if (!is_array($field)) {
+                $field_label = $dict[$field]['field_label'];
+                $field_value = $instance[$field];
+                $field_id = $field;
+            } else {
+
+                $field_label = $dict[$field[0]]['field_label'];
+
+                $field_value = $instance[$field[1]];
+                $field_id = $field[1];
+
+                if ($dict[$field[0]]['field_type'] === 'dropdown') {
+                    $field_choices = "<option value='' selected disabled>{$field_label}</option>";
+                    foreach (explode("|", $dict[$field[0]]['select_choices_or_calculations']) as $choice) {
+                        $choice_parts = explode(",", $choice);
+                        $field_choices .= "<option value='{$choice_parts[0]}'>{$choice_parts[1]}</option>";
+                    }
+
+                    $field_choices .= "</select></div>";
+                    $field_label = "<div class='form-group col-md-8'>
+                          <select id='{$field[0]}' class='form-control'>
                                 {$field_choices}
                           </select>
                       </div>";
-            }
+                }
 
-            //handle free text fields that aren't dates
-            //if (($dict[$field]['field_type'] == 'text') && ($dict[$field]['text_validation_type_or_show_slider_number'] !== 'date_ymd')) {
-            if (($dict[$field]['field_type'] == 'text') && (strpos( $field, 'elective_' ) === 0)) {
-                $field_elective_label = substr($field, 0, -5);
-                $field_elective_value = $instance[$field_elective_label];
-                $field_label = "<input id='{$field_elective_label}' type='text' class='form-control dt' value='{$field_elective_value}' placeholder='Please enter {$field_label}'/> ";
+                //handle free text fields that aren't dates
+                //if (($dict[$field]['field_type'] == 'text') && ($dict[$field]['text_validation_type_or_show_slider_number'] !== 'date_ymd')) {
+                if (($dict[$field[0]]['field_type'] == 'text') && (strpos($field[0], 'elective_') === 0)) {
+
+                    //$field_elective_label = substr($field[0], 0, -5);
+                    $field_elective_value = $instance[$field[0]];
+                    $field_label = "<input id='{$field[0]}' type='text' class='form-control elective' value='{$field_elective_value}' placeholder='Please enter {$field_label}'/> ";
+                }
             }
 
              $htm .= '<tr><td>'
@@ -291,7 +299,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
             "</td>
                   <td>
                       <div class='input-group date'  >
-                          <input id='{$field}' type='text' class='form-control dt' value='{$field_value}' placeholder='yyyy-mm-dd'/>
+                          <input id='{$field_id}' type='text' class='form-control dt' value='{$field_value}' placeholder='yyyy-mm-dd'/>
                           <span class='input-group-addon'>
                                <span class='glyphicon glyphicon-calendar'></span>
                            </span>
