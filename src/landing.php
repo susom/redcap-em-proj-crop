@@ -83,7 +83,7 @@ if (isset($_POST['schedule'])) {
 if (isset($_POST['save_form'])) {
     $module->emDebug("Handling Save Form");
 
-    $save_data = $module->setupSaveData($_POST['date_values'],$_POST['text_values'],  $_POST['checked_values']);
+    $save_data = $module->setupSaveData($_POST['date_values'],$_POST['text_values'],  $_POST['coded_values']);
 
     $module->emDebug($save_data);
     $save_status = $rf->saveInstance($record, $save_data, $last_instance, $exam_event);
@@ -179,15 +179,23 @@ if (isset($_POST['save_form'])) {
 
             console.log("saving form...");
 
-            //todo: this is actually text data sa rename to textValues
             let dateValues = {};
             $('.form-control.dt').each(function () {
                 dateValues[$(this).attr("id")] = $(this).val();
             });
 
+            let textValues = {};
+            $('.form-control.elective').each(function () {
+                textValues[$(this).attr("id")] = $(this).val();
+            });
+
+            let codedValues = {};
+
             let formValues = {
                 "save_form" : true,
-                "date_values" : dateValues
+                "date_values" : dateValues,
+                "text_values" : textValues,
+                "coded_values": codedValues
             };
 
 
