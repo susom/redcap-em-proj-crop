@@ -10,7 +10,7 @@ use REDCap;
 $module->emDebug("Starting CROP landing page for project $pid");
 
 $sunet_id = $_SERVER['WEBAUTH_USER'];
-//$sunet_id = 'cat';
+//$sunet_id = 'foo';
 
 //if sunet ID not set leave
 if (!isset($sunet_id)) {
@@ -39,15 +39,16 @@ $rf->loadData($record, null, null);
 
 $exam_event = $module->getProjectSetting('exam-event');
 $last_instance = $rf->getLastInstanceId($record,$exam_event);
-$instance = $rf->getInstanceById($record, $last_instance, $exam_event);
+
 
 $module->emDebug("last instance id is $last_instance");
 
 //there is instance yet
-if ($last_instance === false) {
+if ($last_instance === null) {
     $module->emDebug("No instance yet, creating a new one");
     $last_instance = 1;
 }
+$instance = $rf->getInstanceById($record, $last_instance, $exam_event);
 //$module->emDebug("Last instance is $last_instance", $instance);
 //$latest_instance = getLatestSeminar($record);
 
