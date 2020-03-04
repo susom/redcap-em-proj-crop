@@ -37,6 +37,21 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
        array("elective_4", "elective_4_date")
     );
 
+    var $recert_fields = array(
+        "rf_date_ethics",
+        "rf_date_hipaa",
+        array("rf_core_1_date", "rf_core_1_sponsor", "rf_core_1_title"),
+        array("rf_core_2_date", "rf_core_2_sponsor", "rf_core_2_title"),
+        array("rf_core_3_date", "rf_core_3_sponsor", "rf_core_3_title"),
+        array("rf_class_1_date", "rf_class_1_sponsor", "rf_class_1_title"),
+        array("rf_class_2_date", "rf_class_2_sponsor", "rf_class_2_title"),
+        array("rf_class_3_date", "rf_class_3_sponsor", "rf_class_3_title"),
+        array("rf_class_4_date", "rf_class_4_sponsor", "rf_class_4_title"),
+        array("rf_class_5_date", "rf_class_5_sponsor", "rf_class_5_title"),
+        array("rf_class_6_date", "rf_class_6_sponsor", "rf_class_6_title"),
+        array("rf_class_7_date", "rf_class_7_sponsor", "rf_class_7_title")
+    );
+
     public function redcap_save_record($project_id, $record = NULL, $instrument, $event_id, $group_id = NULL, $survey_hash = NULL, $response_id = NULL, $repeat_instance) {
         //On save of exam date, set the dates for expiration and notifications
         //if form is admin_exam_dates_and_status
@@ -213,7 +228,10 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         //should this be parametrized?
         $target_id_field = "webauth_user";
         $firstname_field = "first_name";
-        $lastname_field = "last_name";
+        $lastname_field  = "last_name";
+        $cert_status     = "cert_status";
+        $cert_start      = "cert_start";
+        $cert_end        = "cert_end";
         $date_start_field = "st_date_seminar_start";
 
         if (empty($id)) {
@@ -234,7 +252,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         $params = array(
             'return_format' => 'json',
             'events'        =>  $target_event,
-            'fields'        => array( REDCap::getRecordIdField(), $firstname_field, $lastname_field),
+            'fields'        => array( REDCap::getRecordIdField(), $firstname_field, $lastname_field, $cert_status, $cert_start, $cert_end),
             'filterLogic'   => $filter
         );
 
@@ -270,15 +288,23 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
                 $field_id = $field[1];
 
                 if ($dict[$field[0]]['field_type'] === 'dropdown') {
-                    $field_choices = "<option value='' selected disabled>{$field_label}</option>";
+
+                    $selected = trim($instance[$field[0]]);
+
+                    $default_selected_display = $selected == '' ? 'selected disabled' : '';
+                    //$this->emDebug("SELECTED? $field[0] :  " . $selected . " : " . ($selected == ''). " :display=> ". $default_selected_display);
+
+                    $field_choices = "<option value='' {$default_selected_display}>{$field_label}</option>";
                     foreach (explode("|", $dict[$field[0]]['select_choices_or_calculations']) as $choice) {
                         $choice_parts = explode(",", $choice);
-                        $field_choices .= "<option value='{$choice_parts[0]}'>{$choice_parts[1]}</option>";
+                        $choice_selected_display = ($selected == $choice_parts[0]) ? 'selected' : '';
+                        //$this->emDebug("SELECTED?  :  " . $choice_parts[0] . " : " . ($selected == $choice_parts[0]). " :display=> ". $choice_selected_display);
+                        $field_choices .= "<option value='{$choice_parts[0]}'  {$choice_selected_display}>{$choice_parts[1]}</option>";
                     }
 
                     $field_choices .= "</select></div>";
                     $field_label = "<div class='form-group col-md-8'>
-                          <select id='{$field[0]}' class='form-control'>
+                          <select id='{$field[0]}' class='form-control select'>
                                 {$field_choices}
                           </select>
                       </div>";
@@ -294,9 +320,9 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
                 }
             }
 
-             $htm .= '<tr><td>'
-            .$field_label.
-            "</td>
+            $htm .= '<tr><td>'
+                .$field_label.
+                "</td>
                   <td>
                       <div class='input-group date'  >
                           <input id='{$field_id}' type='text' class='form-control dt' value='{$field_value}' placeholder='yyyy-mm-dd'/>
@@ -310,6 +336,55 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
         return $htm;
     }
+
+
+    public function getRecertification($instance) {
+        $instrument = 'recertification_form';
+        $htm  = '';
+
+        $dict = REDCap::getDataDictionary($this->getProjectId(),'array', false, null, $instrument);
+        //$this->emDebug($instance);
+
+        foreach ($this->recert_fields as $field) {
+
+            //if array, then it is date - sponsor - class
+            if (!is_array($field)) {
+                $field_date_value = $instance[$field];
+                $field_date_id = $field;
+                $field_sponsor = (strpos($field, 'ethics') !== false) ? 'RCO' :'Privacy';
+                $field_class = $dict[$field]['field_label'];
+            } else {
+                $field_date_value = $instance[$field[0]];
+                $field_date_id = $field[0];
+                $field_sponsor = "<input id='{$field[1]}' type='text' class='form-control elective' value='{$instance[$field[1]]}' placeholder='Please enter Sponsor'/> ";
+                $class_label = (strpos($field[2], 'core') !== false) ? 'CORE TITLE' :'CLASS TITLE';
+
+                $field_class = "<input id='{$field[2]}' type='text' class='form-control elective' value='{$instance[$field[2]]}' placeholder='{$class_label}'/> ";
+            }
+
+            //date - sponsor - class
+            $htm .= "<tr>".
+                "<td>
+                      <div class='input-group date'  >
+                          <input id='{$field_date_id}' type='text' class='form-control dt' value='{$field_date_value}' placeholder='yyyy-mm-dd'/>
+                          <span class='input-group-addon'>
+                               <span class='glyphicon glyphicon-calendar'></span>
+                           </span>
+                      </div>
+                  </td>".
+                "<td>"
+                .$field_sponsor.
+                "</td>".
+                "<td>"
+                .$field_class.
+                "</td>".
+              "</tr>";
+        }
+
+        return $htm;
+    }
+
+
 
     public function scheduleExam($record) {
         //todo use config property
@@ -327,7 +402,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
         $codedArray = array();
         foreach ($coded as $field_name => $field_value) {
-            $codedArray[$field_name] = db_escape($field_value);
+            $codedArray[$field_name] = $field_value;
         }
 
         $textArray = array();
