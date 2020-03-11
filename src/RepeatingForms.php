@@ -1,5 +1,6 @@
 <?php
 namespace Stanford\ProjCROP;
+/** @var \Stanford\ProjCROP\ProjCROP $module */
 
 use Project;
 use REDCap;
@@ -315,6 +316,8 @@ class RepeatingForms
      */
     public function getInstanceById($record_id, $instance_id, $event_id=null)
     {
+        global $module;
+
         if ($this->is_longitudinal && is_null($event_id)) {
             $this->last_error_message = "You must supply an event_id for longitudinal projects in " . __FUNCTION__;
             return false;
@@ -326,6 +329,8 @@ class RepeatingForms
         if ($this->data_loaded == false || $this->record_id != $record_id || $this->event_id != $event_id) {
             $this->loadData($record_id, $event_id, null);
         }
+
+        //$module->emDebug("looking for instance $instance_id", $this->data[$record_id][$event_id]); exit;
 
         // If the record and optionally event match, return the data.
         if ($this->is_longitudinal) {
@@ -397,10 +402,10 @@ class RepeatingForms
     public function getLastInstanceId($record_id, $event_id=null) {
         global $module;
 
-        $module->emDebug("Location last instance id for record $record_id and event $event_id");
+        //$module->emDebug("Location last instance id for record $record_id and event $event_id");
         if ($this->is_longitudinal && is_null($event_id)) {
             $this->last_error_message = "You must supply an event_id for longitudinal projects in " . __FUNCTION__;
-            $module->emError($this->last_error_message);
+            //$module->emError($this->last_error_message);
             return false;
         } else if (!$this->is_longitudinal) {
             $event_id = $this->event_id;
@@ -412,24 +417,28 @@ class RepeatingForms
             //doesn't this need to be reloaded to get the latest
             $this->loadData($record_id, $event_id, null);
         }
-        $module->emDebug("Longitudinal  is ". $this->is_longitudinal);
+        //$module->emDebug("Longitudinal  is ". $this->is_longitudinal);
         // If the record_ids (and optionally event_ids) match, return the data.
         if ($this->is_longitudinal) {
             $size = sizeof($this->data[$record_id][$event_id]);
-            $module->emDebug("SIZE is $size");
+
             if ($size < 1) {
                 //todo ask lee ann: not an error? this will prompt return of 1 as first instance
                 //$this->last_error_message = "There are no instances in event $event_id for record $record_id " . __FUNCTION__;
                 //return false;  //shouldn't this return null so that it starts with 1? (line 423);
                 return null;
             } else {
-                return array_keys($this->data[$record_id][$event_id])[$size - 1];
+                //$module->emDebug("SIZE is $size", array_keys($this->data[$record_id][$event_id]), max(array_keys($this->data[$record_id][$event_id])) );
+                //TODO: ASK lee ann why size - 1?
+                //return array_keys($this->data[$record_id][$event_id])[$size - 1];
+                return (max(array_keys($this->data[$record_id][$event_id])));
+
             }
         } else {
             $size = sizeof($this->data[$record_id]);
             if ($size < 1) {
                 $this->last_error_message = "There are no instances for record $record_id " . __FUNCTION__;
-                $module->emDebug($this->last_error_message);
+                //$module->emDebug($this->last_error_message);
                 return false;
             } else {
                 return array_keys($this->data[$record_id])[$size - 1];

@@ -26,6 +26,13 @@
 			"method": "cropNotifyCron",
 			"cron_frequency": "3600",
 			"cron_max_run_time": "300"
+		},
+		{
+			"cron_name": "crop_reset",
+			"cron_description": "Cron that runs everyday to reset the landing page display",
+			"method": "cropResetCron",
+			"cron_frequency": "3600",
+			"cron_max_run_time": "300"
 		}
 	],
 
@@ -47,7 +54,8 @@
 	},
 
 	"no-auth-pages": [
-		"src/landing"
+		"src/landing",
+		"src/ResetCron"
 	],
 
 	"system-settings": [
@@ -117,6 +125,12 @@
 		{
 			"key": "exam-status-3-field",
 			"name": "<b>Third Exam Status Field</b><br>Select Field for THIRD exam status",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "certify-recertify-mode-field",
+			"name": "<b>Certify/Recertify Mode Field</b><br>Select Field for mode status in the event",
 			"required": false,
 			"type": "field-list"
 		},

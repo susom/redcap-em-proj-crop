@@ -17,7 +17,7 @@ if (!isset($sunet_id)) {
     die("SUNet ID was not available. Please webauth in and try again!");
 }
 
-$module->emDebug($_POST);
+//$module->emDebug($_POST);
 //look up the sunet id in the project and present the available status in the data table.
 //1. if none, create new form
 //2. If exists,
@@ -37,9 +37,6 @@ $cert_start      = $dem_array["cert_start"];
 $cert_end        = $dem_array["cert_end"];
 
 $module->emDebug("Record is $record / status is $cert_status ");
-
-
-
 
 //todo: use config property
 $repeating_seminar_instrument = 'seminars_trainings';
@@ -126,7 +123,7 @@ if (isset($_POST['save_form'])) {
 
     $save_data = $module->setupSaveData($_POST['date_values'],$_POST['text_values'],  $_POST['coded_values']);
 
-    $module->emDebug($save_data);
+    //$module->emDebug($save_data);
     $save_status = $rf->saveInstance($record, $save_data, $last_instance, $exam_event);
     if ($save_status == false) {
         $module->emDebug("Error saving : ". $rf->last_error_message);
