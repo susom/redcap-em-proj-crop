@@ -54,13 +54,15 @@ will vary.
 class RepeatingForms
 {
     // Metadata
-    protected $Proj;
+    private $Proj;
     private $pid;
     private $is_longitudinal;
     private $data_dictionary;
     private $fields;
-    protected $events_enabled = array();    // Array of event_ids where the instrument is enabled
+    private $events_enabled = array();    // Array of event_ids where the instrument is enabled
     private $instrument;
+    public $is_survey;
+    private $survey_id;
 
     // Instance
     private $event_id;
@@ -124,9 +126,21 @@ class RepeatingForms
     }
 
     public static function byForm($pid, $instrument_name) {
+
+        if (empty($instrument_name)) {
+            $instance->last_error_message = "Form $instrument_name is not valid in this project";
+            return false;
+        }
+
         $instance = new self($pid);
+
         // Find the fields on this repeating instrument
         $instance->instrument = $instrument_name;
+        if (!isset($instance->Proj->forms[$instance->instrument])) {
+            $instance->last_error_message = "Form $instance->instrument is not valid in this project";
+            return false;
+        }
+
         $instance->data_dictionary = REDCap::getDataDictionary($pid, 'array', false, null, array($instrument_name));
         $instance->fields = array_keys($instance->data_dictionary);
 
@@ -138,8 +152,23 @@ class RepeatingForms
             $instance->event_id = array_keys($instance->Proj->eventInfo)[0];
         }
 
+        // Is this instrument a survey
+        $instance->is_survey = isset($instance->Proj->forms[$instrument_name]["survey_id"]);
+        if ($instance->is_survey) $instance->survey_id = $instance->Proj->forms[$instrument_name]["survey_id"];
+
+
         // Retrieved events
         $all_events = $instance->Proj->getRepeatingFormsEvents();
+
+        // Make sure form is repeating
+        $is_repeating = false;
+        foreach ($instance->Proj->RepeatingFormsEvents as $event_id => $forms) {
+            if (isset($forms[$instance->instrument])) {
+                $is_repeating = true;
+                break;
+            }
+        }
+        if (!$is_repeating) $instance->last_error_message = "$instance->instrument is not set as a repeating form in any events";
 
         //TODO: make sure this works if form is enable in multiple events (not repeating everywhere)
         // See which events have this form enabled
@@ -757,6 +786,23 @@ class RepeatingForms
 
     public function getInstrument() {
         return $this->instrument;
+    }
+
+    /**
+     * Obtain the survey url for this instance of the form
+     * @param $record
+     * @param $instance_id
+     * @return string|null
+     */
+    public function getSurveyUrl($record, $instance_id) {
+        // Make sure the instrument is a survey
+        if(!$this->is_survey) {
+            $this->last_error_message = "This instrument is not a survey";
+            return null;
+        }
+
+        $url = REDCap::getSurveyLink($record, $this->instrument, $this->event_id, $instance_id, $this->pid);
+        return $url;
     }
 
 

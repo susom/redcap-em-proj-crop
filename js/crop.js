@@ -65,6 +65,7 @@
             method: "POST"
         })
             .done(function (data) {
+                console.log("SUCCESS DATA: ", data);
                 if (data.result === 'success') {
                     alert(data.msg);
                     location.reload();
@@ -74,7 +75,7 @@
 
             })
             .fail(function (data) {
-                //console.log("DATA: ", data);
+                console.log("FAIL DATA: ", data);
                 alert("error:", data);
             })
             .always(function () {

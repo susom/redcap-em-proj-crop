@@ -55,7 +55,8 @@
 
 	"no-auth-pages": [
 		"src/landing",
-		"src/ResetCron"
+		"src/ResetCron",
+		"src/NotifyCron"
 	],
 
 	"system-settings": [
@@ -82,13 +83,37 @@
 		},
 		{
 			"key": "exam-event",
-			"name": "<b>Seminar / Traininge Event</b><br>Select Event of the Seminars / Training form",
+			"name": "<b>Seminar / Training Event</b><br>Select Event of the Seminars / Training form",
 			"required": false,
 			"type": "event-list"
 		},
 		{
+			"key": "training-survey-form",
+			"name": "<b>Training/Certification Form</b><br>Select Form learners use to record training and certification",
+			"required": false,
+			"type": "form-list"
+		},
+		{
+			"key": "recertification-form",
+			"name": "<b>Recertification Form</b><br>Select Form where learners use to record recertification",
+			"required": false,
+			"type": "form-list"
+		},
+		{
+			"key": "admin-review-form",
+			"name": "<b>Admin Review Form</b><br>Select Form for admin review",
+			"required": false,
+			"type": "form-list"
+		},
+		{
 			"key": "exam-date-form",
 			"name": "<b>Exam Form</b><br>Select Form where exam dates are saved",
+			"required": false,
+			"type": "form-list"
+		},
+		{
+			"key": "fup-survey-form",
+			"name": "<b>FUP Survey Form</b><br>Select form that is used for Followup Surveys",
 			"required": false,
 			"type": "form-list"
 		},
@@ -161,6 +186,18 @@
 		{
 			"key": "fup-survey-1-yr-field",
 			"name": "<b>One Year Followup Date field</b><br>Select field for the followup survey date 1 year AFTER the last exam date",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "fup-survey-url-1-field",
+			"name": "<b>First Followup Survey URL field</b><br>Select field for the first followup survey url",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "fup-survey-url-2-field",
+			"name": "<b>Second Followup Date field</b><br>Select field for the second followup survey url",
 			"required": false,
 			"type": "field-list"
 		},
