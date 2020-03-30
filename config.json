@@ -47,6 +47,11 @@
 				"name": "CROP: Test Cron Links",
 				"icon": "gear",
 				"url": "src/DisplayCronLinks.php"
+			},
+			{
+				"name": "CROP: Get Next Fup Survey Link",
+				"icon": "gear",
+				"url": "src/GetNextSurveyLink.php"
 			}
 		],
 		"control-center": [

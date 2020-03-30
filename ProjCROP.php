@@ -70,52 +70,6 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
             $this->checkExamAndReset($record, $event_id, $repeat_instance);
             $this->sendLearnerStatusEmail($record, $event_id, $repeat_instance);
         }
-
-        //On save of exam date, set the dates for expiration and notifications
-        //if form is admin_exam_dates_and_status
-        if ($instrument == $this->getProjectSetting('exam-date-form')) {
-
-            //test part
-            //$this->sendNotification("TemplateSurvey", $record, $event_id, $instrument, $repeat_instance); exit;
-
-
-            //get the final date of a PASSED exam
-            $final_date = $this->getExamDate($record, $event_id,$repeat_instance);
-            $this->emDebug("FINAL DATE Is ", $final_date);
-
-
-            if ($final_date === false) {
-                //no need to do anything, don't have passed exam yet.
-                $this->emDebug("No update needed.");
-                return;
-            } else {
-                //exam passed, set up the FUP survey s
-                //Precreate the followup surveys now (in the main baseline survey event
-                //Save the URLs of the survey in two fields in the current repeating event
-                //$fup_data = $this->getFUPSurveyURLs($record, $repeat_instance);
-            }
-
-            //check if expiry passed?  If expiry still valid, no need update event
-            //$final_date < 2 years away
-            //return;
-
-            //exam has passed and expiry not blank and not passed date (no need to create a new event)
-            // 1. create new event instance
-            // 2. update the Dates in the new event
-
-            //get the latest certifying form
-            $recertify_form = 'recertification_form';
-            $rf = RepeatingForms::byEvent($project_id, $this->getProjectSetting('exam-event'));
-            $next_id = $rf->getNextInstanceId($record, $this->getProjectSetting('exam-event'));
-            $this->emDebug("next id is $next_id");
-
-            //$rf->saveInstance($record, )
-            $mode = 1; //recertifying  (0 = certify)
-            $this->updateEndDate($record, $final_date, $event_id, $next_id, 1);
-
-        }
-
-
     }
 
     /**
@@ -123,6 +77,9 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
      *   && instance is the latest instance
      *   && exam passed
      * THEN RESET
+     *   AND trigger first FUP survey (at certification exam pass)
+     *
+     *
      *
      * @param $record
      * @param $event_id
@@ -137,7 +94,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         //get the instance number of the last instance of the last repeating exam event
         $date_exam_field              = $this->getProjectSetting('date-exam-1-field');
         $exam_status_field            = $this->getProjectSetting('exam-status-1-field');
-        $mode_field                     = $this->getProjectSetting('certify-recertify-mode-field');
+        $mode_field                   = $this->getProjectSetting('certify-recertify-mode-field');
 
         $last_instance = $rf->getInstanceById($record, $last_instance_id, $this->getProjectSetting('exam-event'));
         //$this->emDebug($last_instance, $mode_field, $last_instance[$mode_field]);
@@ -151,6 +108,31 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
             $mode = 1; //recertifying  (0 = certify)
             $this->updateEndDate($record, $last_instance[$date_exam_field], $event_id, $next_id, 1);
+
+            //send the followup Survey with the current instance
+            $alert_title = "FUPSurvey";
+            $check_date_field = "fup_survey_1_sent";
+
+            //get the next survey link:
+            $survey_instrument = $this->getProjectSetting('fup-survey-form');
+            $rs = RepeatingForms::byForm($this->getProjectId(), $survey_instrument);
+            $next_survey_instance = $rs->getNextInstanceId($record, $this->getProjectSetting('application-event'));
+
+            $url =  $rs->getSurveyUrl($record,$next_survey_instance);
+
+            //fields to update after send
+            $log_update_array = array(
+                'record_id'                               => $record,
+                'redcap_event_name'                       => REDCap::getEventNames(true, false,$this->getProjectSetting('exam-event')),
+                'redcap_repeat_instance'                  => $next_id,
+                'fup_survey_1_url'                        => $url
+            );
+
+            //todo: unclear what instrument the Alerts method is requiring ? triggering instrument???
+
+            $this->sendTemplateAlert($record, $event_id, $next_id, $survey_instrument, $alert_title, $check_date_field, $log_update_array);
+
+
         }
     }
 
@@ -535,7 +517,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         if (($target_data[$check_date_field] <> $today_str)) {
             $alerts = new Alerts();
             //send the notification
-            $this->emDebug("Sending the $alert_title that learner is ready for exam for record $record instance is $repeat_instance");
+            $this->emDebug("Sending the $alert_title to learner $record instance is $repeat_instance");
             $this->sendAlert( $record, $repeat_instance, $instrument, $alert_title, $alerts);
             /*
                         [record_id] => 4
@@ -734,13 +716,6 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         $mail = $this->setAttachments($mail, $project_id, $id);
         // Attchment from field variable
         $mail = $this->setAttachmentsREDCapVar($mail, $project_id, $data, $record, $event_id, $instrument, $instance, $id, $isLongitudinal);
-    }
-
-    public function sendModifiedNotification($project_id, $id) {
-
-
-
-
     }
 
     /**
