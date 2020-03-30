@@ -10,18 +10,26 @@
         // turn off cached entries
         $("form :input").attr("autocomplete", "off");
 
+        var allEntered = true;
+
         //for each date field add datepicker
         $('.form-control.dt').each(function () {
+            //check that there aren't any empty values
+            if ($(this).val() == '') {
+                allEntered = false;
+            }
+
+            //reposition the datepicker
             $(this).datepicker({
                 format: 'yyyy-mm-dd',
                 orientation: 'auto top left'
             });
         });
 
-        // $('#st_date_citi').datepicker({
-        //     format: 'yyyy-mm-dd',
-        //     orientation: 'auto top left'
-        // });
+        //if all the dates are entered, display the Verify button
+        if (allEntered === true) {
+            $('#complete').show();
+        }
 
         //bind button to save Form
         $('#save_form').on('click', crop.saveForm);
@@ -87,8 +95,29 @@
     crop.schedule = function() {
         console.log("starting verification...");
 
+        let codedValues = {
+            "st_requested_exam"     : $("#st_requested_exam").val()
+        };
+
+        var now = new Date();
+        var d2 = now.toString("yyyy-MM-dd");
+
+        var d = new Date();
+        date = [
+            d.getFullYear(),
+            ('0' + (d.getMonth() + 1)).slice(-2),
+            ('0' + d.getDate()).slice(-2)
+        ].join('-');
+
+        let dateValues = {
+            "date_training_completion" : date
+        };
+
+
         let formValues = {
-            "schedule": true
+            "schedule" : true,
+            "coded_values" : codedValues,
+            "date_values"  : dateValues
         };
 
         $.ajax({

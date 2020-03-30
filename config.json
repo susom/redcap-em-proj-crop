@@ -118,38 +118,20 @@
 			"type": "form-list"
 		},
 		{
+			"key": "last-alert-template-sent-field",
+			"name": "<b>Last Alert Template Field</b><br>Select Field to log last Alert Template sent",
+			"required": false,
+			"type": "field-list"
+		},
+		{
 			"key": "date-exam-1-field",
-			"name": "<b>First Exam Date Field</b><br>Select Field for first exam date",
+			"name": "<b>Exam Date Field</b><br>Select Field for first exam date",
 			"required": false,
 			"type": "field-list"
 		},
 		{
 			"key": "exam-status-1-field",
-			"name": "<b>First Exam Status Field</b><br>Select Field for first exam status",
-			"required": false,
-			"type": "field-list"
-		},
-		{
-			"key": "date-exam-2-field",
-			"name": "<b>Second Exam Date Field</b><br>Select Field for SECOND exam date",
-			"required": false,
-			"type": "field-list"
-		},
-		{
-			"key": "exam-status-2-field",
-			"name": "<b>Second Exam Status Field</b><br>Select Field for SECOND exam status",
-			"required": false,
-			"type": "field-list"
-		},
-		{
-			"key": "date-exam-3-field",
-			"name": "<b>Third Exam Date Field</b><br>Select Field for THIRD exam date",
-			"required": false,
-			"type": "field-list"
-		},
-		{
-			"key": "exam-status-3-field",
-			"name": "<b>Third Exam Status Field</b><br>Select Field for THIRD exam status",
+			"name": "<b>Exam Status Field</b><br>Select Field for first exam status",
 			"required": false,
 			"type": "field-list"
 		},

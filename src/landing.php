@@ -57,7 +57,7 @@ $exam_event = $module->getProjectSetting('exam-event');
 $last_instance = $rf->getLastInstanceId($record,$exam_event);
 
 
-$module->emDebug("last instance id is $last_instance");
+//$module->emDebug("last instance id is $last_instance", $_POST);
 
 //there is instance yet
 if ($last_instance === null) {
@@ -71,6 +71,11 @@ $instance = $rf->getInstanceById($record, $last_instance, $exam_event);
 
 if (isset($_POST['schedule'])) {
     $module->emDebug("Verification requested... ");
+
+    //save the testing time field (learner gets to chose between Spring / Fall)
+    $save_data = $module->setupSaveData($_POST['date_values'], null, $_POST['coded_values']);
+    $save_status = $rf->saveInstance($record, $save_data, $last_instance, $exam_event);
+
     $module->sendAdminVerifyEmail($record, $exam_event, $last_instance);
     $result = array(
         'result' => 'success',
@@ -104,15 +109,12 @@ if (isset($_POST['schedule'])) {
 
 if (isset($_POST['recertify'])) {
     $module->emDebug("Handling recertification");
-    $rf_ready_for_verification_field = "rf_ready_for_verification";  //checkbox from recertification form
 
     $status = $module->sendAdminVerifyRecertificationEmail($record, $exam_event, $last_instance);
-    //if () {
-        $result = array(
-            'result' => 'success',
-            'msg' => 'Recertification validation has been started. You will be contacted soon on its status.'
-        );
-    //}
+    $result = array(
+        'result' => 'success',
+        'msg' => 'Recertification validation has been started. You will be contacted soon on its status.'
+    );
 
     /*
     $recertify_data = array(); //reset
@@ -163,7 +165,7 @@ if (isset($_POST['save_form'])) {
         $module->emDebug("Success saving : ". $rf->last_error_message);
         $result = array(
             'result' => 'success',
-            'msg' => 'Your form has been saved. If ready to start verification, click the Start Verification button below to schedule an exam.'
+            'msg' => 'Your form has been saved. Verification process can be started once  all dates are entered.'
         );
     }
 

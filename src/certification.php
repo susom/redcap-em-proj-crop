@@ -44,9 +44,11 @@ namespace Stanford\ProjCROP;
                 </table>
             </div>
             <button type="submit" id="save_form" class="btn btn-primary" value="true">Save Form</button>
-            <br>
-            <hr>
-            <div class="form-group col-md-4">
+            <br><br>
+            <div style="display:none;" id="complete">
+
+                <hr>
+                <div class="form-group col-md-4">
                 <select id="st_requested_exam" class="form-control select" autocomplete="off">
                     <option value="" selected="" disabled="">Requested Exam (Please select)</option>
                     <option value="1"> Spring </option>
@@ -54,9 +56,9 @@ namespace Stanford\ProjCROP;
                 </select>
             </div>
             <button type="submit" id="schedule" class="btn btn-primary" value="true">Start Verification /  Schedule Exam</button>
+            </div>
+            <br><br>
         </form>
-
-    </div>
 
     </div>
     </body>

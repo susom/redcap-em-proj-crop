@@ -65,19 +65,10 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         //
         $this->emDebug("Just saved $instrument in instance $repeat_instance");
 
-        //on save of training/certification form, trigger email to admin to verify the training
-        if ($instrument == $this->getProjectSetting('training-survey-form')) {
-            //$this->sendAdminVerifyEmail($record, $event_id, $repeat_instance);
-        }
-
-        //on save of recertification form, trigger email to admin to verify the training
-        if ($instrument == $this->getProjectSetting('recertification-form')) {
-            //$this->sendAdminVerifyRecertificationEmail($record, $event_id, $repeat_instance);
-        }
-
         //on save of admin_review form, trigger email to admin to verify the training
         if ($instrument == $this->getProjectSetting('admin-review-form')) {
-            $this->sendLearnerRetryEmail($record, $event_id, $repeat_instance);
+            $this->checkExamAndReset($record, $event_id, $repeat_instance);
+            $this->sendLearnerStatusEmail($record, $event_id, $repeat_instance);
         }
 
         //On save of exam date, set the dates for expiration and notifications
@@ -125,6 +116,42 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         }
 
 
+    }
+
+    /**
+     * if MODE = certification
+     *   && instance is the latest instance
+     *   && exam passed
+     * THEN RESET
+     *
+     * @param $record
+     * @param $event_id
+     * @param $repeat_instance
+     */
+    public function checkExamAndReset($record, $event_id, $repeat_instance) {
+
+        $rf = RepeatingForms::byEvent($this->getProjectId(), $this->getProjectSetting('exam-event'));
+        $last_instance_id = $rf->getLastInstanceId($record, $this->getProjectSetting('exam-event'));
+        $this->emDebug("last instance is $last_instance_id");
+
+        //get the instance number of the last instance of the last repeating exam event
+        $date_exam_field              = $this->getProjectSetting('date-exam-1-field');
+        $exam_status_field            = $this->getProjectSetting('exam-status-1-field');
+        $mode_field                     = $this->getProjectSetting('certify-recertify-mode-field');
+
+        $last_instance = $rf->getInstanceById($record, $last_instance_id, $this->getProjectSetting('exam-event'));
+        //$this->emDebug($last_instance, $mode_field, $last_instance[$mode_field]);
+
+        $this->emDebug("Exam date is ".$last_instance[$date_exam_field]." / status is ".$last_instance[$exam_status_field]." / mode is ".$last_instance[$mode_field]);
+        // IN latest instance
+        //if mode is certification (empty or 0) && exam passed, then create a new instance
+        if (($last_instance[$mode_field]!='2') && $last_instance[$exam_status_field] == '1') {
+            $next_id = $rf->getNextInstanceId($record, $this->getProjectSetting('exam-event'));
+            $this->emDebug("MODE IS certification and exam was passed!  Proceed to create new instance; next id is $next_id");
+
+            $mode = 1; //recertifying  (0 = certify)
+            $this->updateEndDate($record, $last_instance[$date_exam_field], $event_id, $next_id, 1);
+        }
     }
 
 
@@ -217,138 +244,57 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         //Alert #3: Seminars not complete - send review email
         // -- Admin reviewed seminars and finds it needs corrections
         // -- Admin checks the checkbox 'resend_portal_review_1'
-        $this->sendSeminarIncompleteEmail($alerts); //this passes by reference, i think?
+        //$this->sendSeminarIncompleteEmail($alerts); //this passes by reference, i think?
 
         //
     }
 
+    /**
+     * Sending template alert when the learner requests Verification after completing the Recertification form
+     *
+     * @param $record
+     * @param $event_id
+     * @param $repeat_instance
+     */
     public function sendAdminVerifyEmail($record, $event_id, $repeat_instance) {
-        $alert_title = "CheckRecertification";
-        $ready_for_exam_field = 'ready_for_exam';
-        $ts_ready_exam_notify_field = "ts_ready_exam_notify";
-        $repeating_event_name = REDCap::getEventNames(true, false,$this->getProjectSetting('exam-event'));
+        $this->emDebug("in sendAdminVerifyEmail");
 
-        //check that the ready_for_exam field is checked
-        $params = array(
-            'return_format' => 'json',
-            'records'       => array($record),
-            'events'        =>  $event_id,
-            'redcap_repeat_instance' => $repeat_instance,
-            'fields'        => array( REDCap::getRecordIdField(), $ready_for_exam_field, $ts_ready_exam_notify_field)
-            //'filterLogic'   => $filter    //TODO ask filter does not work with repeating events
+        $alert_title = "ScheduleExam";     // alert template title
+        $check_date_field = "ts_ready_exam_notify";  // field to log date when email sent
+
+        //fields to update after send
+        $log_update_array = array(
+            'record_id'                               => $record,
+            'redcap_event_name'                       => REDCap::getEventNames(true, false,$this->getProjectSetting('exam-event')),
+            'redcap_repeat_instance'                  => $repeat_instance
+            //$ts_ready_exam_notify_field               => $today_str, //set timestamp to today    //set in sendTemplateAlert
+            //$last_alert_template_sent_field           => $alert_title //update the alertsent field  //set in sendTemplateAlert
         );
 
-        $q = REDCap::getData($params);
-        $records = json_decode($q, true);
-        $target_data = $records[0];
-
-        $this->emDebug($target_data);
-
-        $today = new DateTime();
-        $today_str = $today->format('Y-m-d');
-
-        //if checkbox is checked then send email to admin
-        //if ($target_data[$ready_for_exam_field . "___1"] == '1'  &&  ($target_data[$ts_ready_exam_notify_field] <> $today_str)) {
-        if (($target_data[$ts_ready_exam_notify_field] <> $today_str)) {
-            $alerts = new Alerts();
-            //send the notification
-            $this->emDebug("Sending the Notification to Admin that learner is ready for exam for record $record instance is $repeat_instance");
-            $this->sendAlert( $record, $repeat_instance, $this->getProjectSetting('training-survey-form'), $alert_title, $alerts);
-
-/*
-            [record_id] => 4
-            [redcap_event_name] => exam_arm_1
-            [redcap_repeat_instrument] =>
-            [redcap_repeat_instance] => 1
-            [ready_for_exam___1] => 1
-*/
-            $save_data = array(
-                'record_id'                               => $record,
-                'redcap_event_name'                       => $repeating_event_name,
-                'redcap_repeat_instance'                  => $repeat_instance,
-                $ready_for_exam_field . "___1" => 0, //unset the checkbox
-                $ts_ready_exam_notify_field             => $today_str, //set timestamp to today
-                $last_alert_template_sent_field           => $alert_title //update the alertsent field
-            );
-
-            $status = REDCap::saveData('json', json_encode(array($save_data)));
-            $this->emDebug("Saving this data and status", $save_data, $status);
-
-            return;
-        }
+        //todo: unclear what instrument the Alerts method is requiring ? triggering instrument???
+        $instrument = $this->getProjectSetting('training-survey-form');
+        $this->sendTemplateAlert($record, $event_id, $repeat_instance, $instrument, $alert_title, $check_date_field, $log_update_array);
     }
 
     public function sendAdminVerifyRecertificationEmail($record, $event_id, $repeat_instance) {
-        $alert_title = "CheckRecertification";
+        $alert_title      = "CheckRecertification";
+        $check_date_field = "rf_ts_recertify_notify";     //timestamp on email sent
 
-        //triggering conditions
-        $rf_ready_for_verification_field = "rf_ready_for_verification";  //checkbox from recertification form
-        $rf_recertification_form_field   = "recertification-form";       //form for recertification
-        $repeating_event_name = REDCap::getEventNames(true, false,$this->getProjectSetting('exam-event'));
-
-        //status fields to update
-        $rf_ts_recertify_notify_field    = "rf_ts_recertify_notify";     //timestamp on email sent
-        $last_alert_template_sent_field  = "last_alert_template_sent";  // field to hold last email template sent
-
-        //check that the ready_for_exam field is checked
-        $params = array(
-            'return_format' => 'json',
-            'records'       => array($record),
-            'events'        =>  $event_id,
-            'redcap_repeat_instance' => $repeat_instance,
-            'fields'        => array( REDCap::getRecordIdField(), $rf_ready_for_verification_field, $rf_ts_recertify_notify_field)
-            //'filterLogic'   => $filter    //TODO ask filter does not work with repeating events
+        //fields to update after send
+        $log_update_array = array(
+            'record_id'                               => $record,
+            'redcap_event_name'                       => REDCap::getEventNames(true, false,$this->getProjectSetting('exam-event')),
+            'redcap_repeat_instance'                  => $repeat_instance
         );
 
-        $q = REDCap::getData($params);
-        $records = json_decode($q, true);
-        $target_data = $records[0];
+        //todo: unclear what instrument the Alerts method is requiring ? triggering instrument???
+        $instrument = $this->getProjectSetting('recertification-form');
+        $this->sendTemplateAlert($record, $event_id, $repeat_instance, $instrument, $alert_title, $check_date_field, $log_update_array);
 
-        $this->emDebug($target_data);
-
-        $today = new DateTime();
-        $today_str = $today->format('Y-m-d');
-
-        //if checkbox is checked then send email to admin
-//        if ($target_data[$rf_ready_for_verification_field."___1"] == '1'  &&  ($target_data[$rf_ts_recertify_notify_field] <> $today_str)) {
-        if (($target_data[$rf_ts_recertify_notify_field] <> $today_str)) {
-            $alerts = new Alerts();
-                //send the notification
-                $this->emDebug("Sending the Notification to Admin that learner is ready for recertification for record $record instance is $repeat_instance");
-                $this->sendAlert( $record, $repeat_instance, $rf_recertification_form_field, $alert_title, $alerts);
-
-                /*
-                            [record_id] => 4
-                            [redcap_event_name] => exam_arm_1
-                            [redcap_repeat_instrument] =>
-                            [redcap_repeat_instance] => 1
-                            [ready_for_exam___1] => 1
-                */
-
-                $save_data = array(
-                    'record_id'                               => $record,
-                    'redcap_event_name'                       => $repeating_event_name,
-                    'redcap_repeat_instance'                  => $repeat_instance,
-                    $rf_ready_for_verification_field . "___1" => 0, //unset the checkbox
-                    $rf_ts_recertify_notify_field             => $today_str, //set timestamp to today
-                    $last_alert_template_sent_field           => $alert_title //update the alertsent field
-                );
-
-
-                $status = REDCap::saveData('json', json_encode(array($save_data)));
-                $this->emDebug("Saving this data and status", $save_data, $status);
-
-                if ($status) {
-                    return true;
-                } else {
-                    return false;
-                }
-        }
     }
 
-
-    public function sendLearnerRetryEmail($record, $event_id, $repeat_instance) {
-        $this->emDebug("sending learner to RETRY");
+    public function sendLearnerStatusEmail($record, $event_id, $repeat_instance) {
+        $this->emDebug("sending learner status email ");
 
         //fields for recertification mode
         $mode_field = "mode";    //see which mode
@@ -357,7 +303,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         $last_alert_template_sent_field = "last_alert_template_sent";
         $resend_portal_review_field = "resend_portal_review_1";
         $resend_date_stamp_field = "resend_date_stamp";
-        $ready_for_exam_field = "ready_for_exam";
+        //$ready_for_exam_field = "ready_for_exam";
         $needs_review_field = "needs_review_1";
 
         //fields for send exam date fields
@@ -418,6 +364,13 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         $today = new DateTime();
         $today_str = $today->format('Y-m-d');
         $alerts = new Alerts();
+
+        $this->emDebug("MODE IS  / ", $k);
+
+        if ($k[$resend_date_stamp_field] == $today_str) {
+            $this->emDebug("EMAIL already sent to user today.  Not sending any more emails");
+            return false;
+        }
 
         if ($k[$mode_field] == "1") {
             //if in recertification mode, just check that the
@@ -520,8 +473,8 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
                 'redcap_event_name' => $repeating_event_name,
                 'redcap_repeat_instance'         => $repeat_instance,
                 $resend_portal_review_field . "___1"  => 0, //unset the checkbox
-                $ready_for_exam_field . "___1"  => 0, //unset the checkbox
-                $needs_review_field             => '', //unset the checkbox
+                //$ready_for_exam_field . "___1"  => 0, //unset the checkbox
+                $needs_review_field             => '', //unset the radiobutton todo: how to reset a radiobutton?
                 $resend_date_stamp_field         => $today_str,
                 $last_alert_template_sent_field  => 'SeminarIncomplete' //set timestamp to today
             );
@@ -530,94 +483,75 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
             $status = REDCap::saveData('json', json_encode(array($save_data)));
             $this->emDebug("Saving this data",$save_data,  $status);
         }
+
     }
 
     /**
-     * Admin checks that the seminar/training are verified
      *
+     *
+     * @param $record
+     * @param $event_id - event_id where the check_date_field is located
+     * @param $repeat_instance - repeat_instance number where the check_date_field
+     * @param $instrument
+     * @param $alert_title
      * @param $alerts
-     * @throws \Exception
+     * @param $check_date_field - check field is empty to prevent multiple sends on same day (if populated, don't send)
+     * @param $log_update_array   - array of fields to log with send updates
      */
-    public function sendSeminarIncompleteEmail($alerts) {
-        $resend_portal_review_field = "resend_portal_review_1";
-        $resend_date_stamp_field = "resend_date_stamp";
-        $ready_for_exam_field = "ready_for_exam";
-        $needs_review_field = "needs_review_1";
+    public function sendTemplateAlert($record, $event_id, $repeat_instance, $instrument, $alert_title, $check_date_field, $log_update_array) {
+        $this->emDebug("SEnding $alert_title for Record $record check_date_field is $check_date_field");
 
-        $repeating_event = $this->getProjectSetting('exam-event');
-
-        //iterate through records with filter [exam_arm_1][resend_portal_review_1(1)]='1' is checked
-        //check that the date in timestamp field  is not today
-        //Send notification
-        //Uncheck the checkbox: resend_portal_review_1
-        //Clear out contents of resend_review_notes_1
-        //Set timestamp to today
-
-        //iterate through records with filter [exam_arm_1][resend_portal_review_1(1)]='1' is checked
-
-        $event_filter_str =  "[" . REDCap::getEventNames(true, false, $repeating_event) . "]";
-
-        //filter resend field is 1
-        $filter = $event_filter_str . "[" . $resend_portal_review_field . "___1] = 1";
-
-        //add filter to make sure that the date is not today
-        $today = new DateTime();
-        $today_str = $today->format('Y-m-d');
-       // $filter .= " AND " . $event_filter_str . "[" . $resend_date_stamp_field . "] <> '$today_str'";
-
+        //check that the email not already sent
+        //check that the ready_for_exam field is checked
         $params = array(
             'return_format' => 'json',
-            'events'        =>  $repeating_event,
-            'fields'        => array( REDCap::getRecordIdField(), $resend_portal_review_field, $resend_date_stamp_field),
-            //'filterLogic'   => $filter    //TODO ask filter does not work with repeating events/**/
+            'records'       => array($record),
+            'events'        =>  $event_id,
+            'redcap_repeat_instance' => $repeat_instance,     //Adding parameter here does NOT seem to limit the getData to this instance
+            'fields'        => array( REDCap::getRecordIdField(), $check_date_field)
+            //'filterLogic'   => $filter    //TODO filter does not work with repeating events??
         );
-
 
         $q = REDCap::getData($params);
         $records = json_decode($q, true);
 
-        //$this->emDebug($filter, $params, $records, $repeating_forms); exit;
+        $target_data = $records[0]; //for the cases where repeat_instance is not set (instance = 0 sometimes is not set)?
 
-        //cannot get the filter to work with repeating events
-        //so just iterate over the records and if the filter fits send notification
-        foreach ($records as $k) {
-            $record_id = $k['record_id'];
-            //$this->emDebug("checking ",$k, $k[$resend_portal_review_field . "___1"]);
-
-            if (($k[$resend_portal_review_field . "___1"] == '1') &&  ($k[$resend_date_stamp_field] <> $today_str)) {
-                $this->emDebug("NEED TO SEND ONE:  ",$k, $k[$resend_portal_review_field . "___1"]);
-
-                //send the notification
-                $this->emDebug("Sending the notifictaion");
-                $this->sendAlert( $record_id, $repeating_event, 'admin_review', "SeminarIncomplete", $alerts);
-
-                //Uncheck the checkbox: resend_portal_review_1
-                //Clear out contents of resend_review_notes_1
-                //Set timestamp to today
-                //Uncheck the checkbox: ready_for_exam
-                //Reset the needs review radiobutton
-
-                /**
-                [record_id] => 6
-                [redcap_event_name] => exam_arm_1
-                [redcap_repeat_instrument] =>
-                [redcap_repeat_instance] => 1
-                [resend_portal_review_1___1] => 1
-                [resend_date_stamp] =>
-                 */
-
-                //update the array to reset the form in the repeating event
-                unset($k['redcap_repeat_instrument']);  // unsetting because its a repeat event not repeating form
-                $k[$needs_review_field] = '';                  //unset needs review field
-                $k[$resend_portal_review_field . "___1"] = 0;  //unset the checkbox
-                $k[$ready_for_exam_field . "___1"] = 0;        //unset the checkbox
-                $k[$resend_date_stamp_field] = $today_str;     //set timestamp to today
-                $this->emDebug("Saving this data", $k);
-                $status = REDCap::saveData('json', json_encode(array($k)));
-
+        //Adding redcap_repeat_instance in getData  does NOT seem to limit the getData to this instance
+        foreach ($records as $cand) {
+            if ($cand['redcap_repeat_instance'] == $repeat_instance) {
+                $this->emDebug("Found instance ". $repeat_instance, $cand);
+                $target_data = $cand;
+                continue;
             }
+        }
 
+        $this->emDebug("Repeat instance is $repeat_instance", $target_data);
 
+        //get today's date
+        $today = new DateTime();
+        $today_str = $today->format('Y-m-d');
+
+        if (($target_data[$check_date_field] <> $today_str)) {
+            $alerts = new Alerts();
+            //send the notification
+            $this->emDebug("Sending the $alert_title that learner is ready for exam for record $record instance is $repeat_instance");
+            $this->sendAlert( $record, $repeat_instance, $instrument, $alert_title, $alerts);
+            /*
+                        [record_id] => 4
+                        [redcap_event_name] => exam_arm_1
+                        [redcap_repeat_instrument] =>
+                        [redcap_repeat_instance] => 1
+                        [ready_for_exam___1] => 1
+            */
+            //add the timestamp field the logUpdateArray
+            $log_update_array[$check_date_field] = $today_str;
+            $log_update_array[$this->getProjectSetting('last-alert-template-sent-field')] = $alert_title;
+
+            $status = REDCap::saveData('json', json_encode(array($log_update_array)));
+            $this->emDebug("Saving this data and status", $log_update_array, $status);
+
+            return;
         }
 
     }
@@ -669,7 +603,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
 
     /**
-     * Looks through all teh Alerts in projects and search for match
+     * Looks through all the Alerts in projects and search for match
      * ex; "Seminars not complete - send review email"
      * And triggers the notification
      *
@@ -688,7 +622,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         //iterate through and find the one that matches the $alert title
         foreach ($alerts as $k) {
             if ($k['alert_title'] == $alert_title) {
-                $this->emDebug("Foudn alret title $alert_title sending notification");
+                $this->emDebug("Found alert title $alert_title sending notification");
                 $id = $k['alert_id'];
                 $foo = $alert->sendNotification($k['alert_id'],$project_id, $record, $event_id, $instrument);
                 $this->emDebug("SENT: ", $foo);
@@ -809,6 +743,13 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
     }
 
+    /**
+     * Create a new instance of the repeating exam event and set the mode
+     *
+     * @param $record
+     * @param $event
+     * @throws \Exception
+     */
     public function resetInstance($record, $event) {
 
 
@@ -861,33 +802,39 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         $final_exam_date_field          = $this->getProjectSetting('final-exam-date-field');
         $date_exam_1_field              = $this->getProjectSetting('date-exam-1-field');
         $exam_status_1_field            = $this->getProjectSetting('exam-status-1-field');
-        $date_exam_2_field              = $this->getProjectSetting('date-exam-2-field');
-        $exam_status_2_field            = $this->getProjectSetting('exam-status-2-field');
-        $date_exam_3_field              = $this->getProjectSetting('date-exam-3-field');
-        $exam_status_3_field            = $this->getProjectSetting('exam-status-3-field');
 
         $params = array(
             'return_format'       => 'json',
             'records'             => $record,
-            'fields'              => array($final_exam_date_field,$date_exam_1_field, $exam_status_1_field,$date_exam_2_field,$exam_status_2_field,
-                $date_exam_3_field,$exam_status_3_field),
+            'fields'              => array($final_exam_date_field,$date_exam_1_field, $exam_status_1_field),
             'events'              => $event,
 //                'redcap_repeat_instrument' => $instrument,       //this doesn't restrict
             'redcap_repeat_instance'   => $repeat_instance   //this doesn't seem to do anything!
         );
 
         $q = REDCap::getData($params);
-        $results = json_decode($q, true);
+        $records = json_decode($q, true);
+
+        $target_data = $records[0];
+
+        //Adding redcap_repeat_instance in getData  does NOT seem to limit the getData to this instance
+        foreach ($records as $cand) {
+            if ($cand['redcap_repeat_instance'] == $repeat_instance) {
+                //$this->emDebug("Found instance ". $repeat_instance, $cand);
+                $target_data = $cand;
+                continue;
+            }
+        }
 
         //$this->emDebug($params,$results, count(array_filter($results[0])));
 
         //nothing set, do nothing,  we are done return false
-        if (count(array_filter($results[0])) < 1) {
+        if (count(array_filter($target_data)) < 1) {
             return false;
         }
 
         //if final_exam_date_field is populated, do nothing, return false
-        if (!empty($results[0][$final_exam_date_field])) {
+        if (!empty($target_data[$final_exam_date_field])) {
             $this->emDebug("Final exam date already set. Do nothing",$results[0][$final_exam_date_field]);
             return false;
         }
@@ -896,23 +843,14 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         //$this->emDebug($results[0][$date_exam_1_field],$results[0][$date_exam_2_field],$results[0][$date_exam_3_field]);
 
         $final_exam_date = '';
-        if (($results[0][$exam_status_1_field]!=='1') && ($results[0][$exam_status_2_field]!=='1') && ($results[0][$exam_status_3_field]!=='1')) {
+        if (($target_data[$exam_status_1_field]!=='1')) {
             $this->emDebug("Exam not passed. Do nothing");
             return false;
         } else {
-            for($i=3; $i>0; $i--) {
-                if ($results[0][${"exam_status_".$i."_field"}]=='1') {
-                    $final_exam_date = $results[0][${"date_exam_".$i."_field"}];
-                    break;
-                }
-            }
-
+            $final_exam_date = $target_data[$date_exam_1_field];
             $this->emDebug("FINAL Exam date is $final_exam_date");
-
         }
-
         return $final_exam_date;
-
     }
 
     /**
@@ -1242,17 +1180,6 @@ exit;
     }
 
 
-
-    public function scheduleExam($record) {
-        //todo use config property
-        $schedule_field  = 'ready_for_exam';
-
-        $data[$schedule_field.'___1'] = '1';
-
-        return $data;
-
-
-    }
 
     public function setupSaveData($date, $text, $coded) {
 

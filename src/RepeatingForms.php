@@ -374,7 +374,7 @@ class RepeatingForms
             if (!empty($this->data[$record_id][$instance_id]) && !is_null($this->data[$record_id][$instance_id])) {
                 return $this->data[$record_id][$instance_id];
             } else {
-                $this->last_error_message = "Instance number is invalid";
+                $this->last_error_message = "Instance number <$instance_id> is invalid";
                 return false;
             }
         }
