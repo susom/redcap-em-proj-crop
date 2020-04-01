@@ -10,7 +10,7 @@ use REDCap;
 $module->emDebug("Starting CROP landing page for project $pid");
 
 $sunet_id = $_SERVER['WEBAUTH_USER'];
-//$sunet_id = 'foo';
+//$sunet_id = 'bix5';
 
 //if sunet ID not set leave
 if (!isset($sunet_id)) {
@@ -33,17 +33,17 @@ $record = $dem_array[REDCap::getRecordIdField()];
 
 $first_name = $dem_array['first_name'];
 $last_name = $dem_array['last_name'];
-$cert_status = $dem_array['cert_status'];
+$cert_mode = $dem_array['cert_mode'];
 
 //if blank or certification, then recertifyy is false
 $recertify = false;
-if ($cert_status) {
+if ($cert_mode) {
     $recertify = true;
 }
 $cert_start      = $dem_array["cert_start"];
 $cert_end        = $dem_array["cert_end"];
 
-$module->emDebug("Record is $record / status is $cert_status ");
+$module->emDebug("Record is $record / status is $cert_mode ");
 
 //todo: use config property
 $repeating_seminar_instrument = 'seminars_trainings';

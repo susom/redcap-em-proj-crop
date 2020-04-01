@@ -21,13 +21,6 @@
 
 	"crons": [
 		{
-			"cron_name": "crop_notification",
-			"cron_description": "Cron that runs everyday to send status changed notifications to learners and admins",
-			"method": "cropNotifyCron",
-			"cron_frequency": "3600",
-			"cron_max_run_time": "300"
-		},
-		{
 			"cron_name": "crop_reset",
 			"cron_description": "Cron that runs everyday to reset the landing page display",
 			"method": "cropResetCron",
@@ -60,8 +53,7 @@
 
 	"no-auth-pages": [
 		"src/landing",
-		"src/ResetCron",
-		"src/NotifyCron"
+		"src/ResetCron"
 	],
 
 	"system-settings": [
@@ -130,13 +122,13 @@
 		},
 		{
 			"key": "date-exam-1-field",
-			"name": "<b>Exam Date Field</b><br>Select Field for first exam date",
+			"name": "<b>Exam Date Field</b><br>Select Field for exam date",
 			"required": false,
 			"type": "field-list"
 		},
 		{
 			"key": "exam-status-1-field",
-			"name": "<b>Exam Status Field</b><br>Select Field for first exam status",
+			"name": "<b>Exam Status Field</b><br>Select Field for exam status",
 			"required": false,
 			"type": "field-list"
 		},

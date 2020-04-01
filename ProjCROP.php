@@ -15,8 +15,6 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
     use emLoggerTrait;
 
-
-
     var $portal_fields = array(
         "st_date_hipaa",
         "st_date_citi",
@@ -73,6 +71,8 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
     }
 
     /**
+     *
+     * Triggering form is admin-review-form
      * if MODE = certification
      *   && instance is the latest instance
      *   && exam passed
@@ -86,9 +86,11 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
      * @param $repeat_instance
      */
     public function checkExamAndReset($record, $event_id, $repeat_instance) {
+        $repeat_event = $this->getProjectSetting('exam-event');
 
-        $rf = RepeatingForms::byEvent($this->getProjectId(), $this->getProjectSetting('exam-event'));
-        $last_instance_id = $rf->getLastInstanceId($record, $this->getProjectSetting('exam-event'));
+        $rf = RepeatingForms::byEvent($this->getProjectId(), $repeat_event);
+        $last_instance_id = $rf->getLastInstanceId($record, $repeat_event);
+        $last_instance = $rf->getInstanceById($record, $last_instance_id, $repeat_event);
         $this->emDebug("last instance is $last_instance_id");
 
         //get the instance number of the last instance of the last repeating exam event
@@ -96,42 +98,18 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         $exam_status_field            = $this->getProjectSetting('exam-status-1-field');
         $mode_field                   = $this->getProjectSetting('certify-recertify-mode-field');
 
-        $last_instance = $rf->getInstanceById($record, $last_instance_id, $this->getProjectSetting('exam-event'));
+
         //$this->emDebug($last_instance, $mode_field, $last_instance[$mode_field]);
 
         $this->emDebug("Exam date is ".$last_instance[$date_exam_field]." / status is ".$last_instance[$exam_status_field]." / mode is ".$last_instance[$mode_field]);
         // IN latest instance
         //if mode is certification (empty or 0) && exam passed, then create a new instance
-        if (($last_instance[$mode_field]!='2') && $last_instance[$exam_status_field] == '1') {
-            $next_id = $rf->getNextInstanceId($record, $this->getProjectSetting('exam-event'));
+        if (($last_instance[$mode_field]!='1') && $last_instance[$exam_status_field] == '1') {
+            $next_id = $rf->getNextInstanceId($record, $repeat_event);
             $this->emDebug("MODE IS certification and exam was passed!  Proceed to create new instance; next id is $next_id");
 
-            $mode = 1; //recertifying  (0 = certify)
-            $this->updateEndDate($record, $last_instance[$date_exam_field], $event_id, $next_id, 1);
-
-            //send the followup Survey with the current instance
-            $alert_title = "FUPSurvey";
-            $check_date_field = "fup_survey_1_sent";
-
-            //get the next survey link:
-            $survey_instrument = $this->getProjectSetting('fup-survey-form');
-            $rs = RepeatingForms::byForm($this->getProjectId(), $survey_instrument);
-            $next_survey_instance = $rs->getNextInstanceId($record, $this->getProjectSetting('application-event'));
-
-            $url =  $rs->getSurveyUrl($record,$next_survey_instance);
-
-            //fields to update after send
-            $log_update_array = array(
-                'record_id'                               => $record,
-                'redcap_event_name'                       => REDCap::getEventNames(true, false,$this->getProjectSetting('exam-event')),
-                'redcap_repeat_instance'                  => $next_id,
-                'fup_survey_1_url'                        => $url
-            );
-
-            //todo: unclear what instrument the Alerts method is requiring ? triggering instrument???
-
-            $this->sendTemplateAlert($record, $event_id, $next_id, $survey_instrument, $alert_title, $check_date_field, $log_update_array);
-
+            $this->emDebug("MODE IS CERTIFICATION and EXAM STATUS was passed!  Proceed to create new instance; next id is $next_id");
+            $this->resetInstanceToRecertify($record, $repeat_event, $next_id, $last_instance[$date_exam_field]);
 
         }
     }
@@ -158,31 +136,6 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
     /* CRON METHODS                                                                                                    */
     /***************************************************************************************************************** */
 
-    /**
-     * Send notification based on dates nad the template Alerts
-     */
-    public function cropNotifyCron() {
-        $this->emDebug("Notify Cron started");
-
-        //get all projects that are enabled for this module
-        $enabled = ExternalModules::getEnabledProjects($this->PREFIX);
-
-        //get the noAuth api endpoint for Cron job.
-        $url = $this->getUrl('src/NotifyCron.php', true, true);
-
-        //while ($proj = db_fetch_assoc($enabled)) {
-        while($proj = $enabled->fetch_assoc()){
-
-            $pid = $proj['project_id'];
-            $this->emDebug("STARTING CROP NOTIFY CRON for pid " . $pid . ' notify url is '.$url);
-
-            $this_url = $url . '&pid=' . $pid;
-
-            //fire off the reset process
-            $resp = http_get($this_url);
-
-        }
-    }
 
     /**
      * Reset the landing page to move to Recertification or Certification (from scratch) depending on date and status
@@ -213,23 +166,6 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
     }
 
 
-    /**
-     * Check all the records to see if it is time for one of the notification alerts
-     */
-    public function checkNotification() {
-        $alerts = new Alerts();
-
-
-
-        //iterate through all the records and check that notifications are not due today.
-
-        //Alert #3: Seminars not complete - send review email
-        // -- Admin reviewed seminars and finds it needs corrections
-        // -- Admin checks the checkbox 'resend_portal_review_1'
-        //$this->sendSeminarIncompleteEmail($alerts); //this passes by reference, i think?
-
-        //
-    }
 
     /**
      * Sending template alert when the learner requests Verification after completing the Recertification form
@@ -539,31 +475,33 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
     }
 
     /**
+     * Called by cron job
      * Check all the records to see if new exam_events instance need to be created.
      */
-    public function checkExpiration() {
+    public function checkExpirationGracePeriod() {
         //iterate through all the records and check that the expiration is not today
-        $cert_status     = "cert_status";
-        $cert_start      = "cert_start";
-        $cert_end        = "cert_end";
+        $cert_mode         = "cert_mode";
+        $cert_start        = "cert_start";
+        $cert_end          = "cert_end";
+        $cert_grace_pd_end = "cert_grace_pd_end";
+        $recertify_mode    = '1';
+        $status_field      = 'recertify_status';
 
         $event_filter_str =  "[" . REDCap::getEventNames(true, false, $this->getProjectSetting('application-event')) . "]";
-        $main_event_expiry_field = 'cert_end';
-        $main_event_certify_field = 'cert_status';
-        $recertify_mode           = '1';
 
         $today = new DateTime();
         $today_str = $today->format('Y-m-d');
 
-        $filter = $event_filter_str . "[" . $main_event_expiry_field . "] = '$today_str'";
+        //find records where the 30 day grace period ends today
+        $filter = $event_filter_str . "[" . $cert_grace_pd_end . "] = '$today_str'";
 
-        //add the filter to check that the cert_status is in recertification
-        $filter .= " AND ". $event_filter_str . "[" . $main_event_certify_field . "] = '$recertify_mode'";
+        //add the filter to check that the $cert_mode is in recertification
+        $filter .= " AND ". $event_filter_str . "[" . $cert_mode . "] = '$recertify_mode'";
 
         $params = array(
             'return_format' => 'json',
             'events'        =>  $event_filter_str,
-            'fields'        => array( REDCap::getRecordIdField(), $cert_status, $cert_start, $cert_end),
+            'fields'        => array( REDCap::getRecordIdField(), $cert_mode, $cert_start, $cert_end, $cert_grace_pd_end),
             'filterLogic'   => $filter
         );
 
@@ -572,20 +510,116 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
         $this->emDebug($filter, $params, $records, $q);
 
-        //iterate through these records (with today as expiration and in recertification mode)
+        //alert->sendNotification needs an event (of triggering event??)
+        $repeat_event = $this->getProjectSetting('exam-event');
+        $trigger_form = $this->getProjectSetting('admin-review-form');
+        $date_exam_field = $this->getProjectSetting('date-exam-1-field');
+        $mode_field      = $this->getProjectSetting('certify-recertify-mode-field');
+
+        //create the REDCap Alerts class to pass on sendAlert method
+        $alerts = new Alerts();
+
+        $rf = RepeatingForms::byEvent($this->getProjectId(), $repeat_event);
+
+        //iterate through these records (with today as grace period expiration and in recertification mode)
         foreach ($records as $record) {
-            //if these
-            $this->sendNotification("TemplateSurvey", $record);
-            $this->resetInstance($record[REDCap::getRecordIdField()], $this->getProjectSetting('exam-event'));
+            $record_id = $record['record_id'];
+
+            //send them the notification for "ExpirationLetter"
+            $this->sendAlert( $record[REDCap::getRecordIdField()], $repeat_event, $trigger_form, "ExpirationLetter", $alerts);
+
+            //create a new instance
+            $last_instance_id = $rf->getLastInstanceId($record_id, $repeat_event);
+            $last_instance = $rf->getInstanceById($record_id, $last_instance_id, $repeat_event);
+
+            //check that the recertify_status is PASS : ]'recertify_status'] == '1'
+            //if mode is certification (empty or 0) && exam passed, then create a new instance
+
+            $this->emDebug($last_instance_id, $mode_field, $last_instance[$mode_field]);
+            //   mode = recertify (not blank, not 0)        status  = PASS  ('1')
+            if ($last_instance[$mode_field] == '1') {
+                $next_id = $rf->getNextInstanceId($record_id, $repeat_event);
+
+                if ($last_instance[$status_field] == '1') {
+                    //STATUS IS PASS
+
+                    /**   RESET TO RECERTIFY */
+                    $this->emDebug("MODE IS RECERTIFICATION and STATUS was passed!  Proceed to create new instance; next id is $next_id");
+                    $this->resetInstanceToRecertify($record_id, $repeat_event, $next_id, $last_instance[$date_exam_field]);
+                } else {
+                    //STATUS IS FAIL or NOT SET
+
+                    /**   RESET TO CERTIFY - START FROM SCRATCH*/
+                    $this->emDebug("MODE IS CERTIFICATION and STATUS was passed!  Proceed to create new instance; next id is $next_id");
+                    $this->resetInstanceToCertify($record_id, $repeat_event, $next_id);
+                }
+
+            }
+
         }
 
+    }
 
+    /**
+     * Check records where today is the date of expiry and mode is  Recertifications
+     * If recertify Verification status ('recertify_status') IS PASS, then create a new instance to Recertification
+     *
+     * @throws \Exception
+     */
+    public function checkExpiration() {
+        //iterate through all the records and check that the expiration is not today
+        $cert_mode        = "cert_mode";
+        $cert_start        = "cert_start";
+        $cert_end          = "cert_end";
+        $cert_grace_pd_end = "cert_grace_pd_end";
+        $date_certified_field = 'date_certification';
+        $recertify_mode    = '1';
 
+        $event_filter_str =  "[" . REDCap::getEventNames(true, false, $this->getProjectSetting('application-event')) . "]";
+
+        $today = new DateTime();
+        $today_str = $today->format('Y-m-d');
+
+        //find records where the 30 day grace period ends today
+        $filter = $event_filter_str . "[" . $cert_end . "] = '$today_str'";
+
+        //add the filter to check that the $cert_mode is in recertification
+        $filter .= " AND ". $event_filter_str . "[" . $cert_mode . "] = '$recertify_mode'";
+
+        $params = array(
+            'return_format' => 'json',
+            'events'        =>  $event_filter_str,
+            'fields'        => array( REDCap::getRecordIdField(), $cert_mode, $cert_start, $cert_end, $cert_grace_pd_end),
+            'filterLogic'   => $filter
+        );
+
+        $q = REDCap::getData($params);
+        $records = json_decode($q, true);
+
+        $this->emDebug($filter, $params, $records, $q);
+
+        $repeat_event = $this->getProjectSetting('exam-event');
+        $trigger_form = $this->getProjectSetting('admin-review-form');
+
+        $rf = RepeatingForms::byEvent($this->getProjectId(), $repeat_event);
+
+        //iterate through these records (with today as grace period expiration and in recertification mode)
+        foreach ($records as $record) {
+
+            $record_id = $record['record_id'];
+
+            $last_instance_id = $rf->getLastInstanceId($record_id, $repeat_event);
+            $next_id = $rf->getNextInstanceId($record_id, $repeat_event);
+            $last_instance = $rf->getInstanceById($record_id, $last_instance_id, $repeat_event);
+
+            //$this->emDebug($record_id, $next_id, $last_instance[$date_certified_field], $last_instance, $date_certified_field); exit;
+            $this->resetInstanceToRecertify($record_id, $repeat_event, $next_id, $last_instance[$date_certified_field]);
+        }
     }
 
 
     /**
-     * Looks through all the Alerts in projects and search for match
+     * Helper method that looks through all the Alerts in projects and search for match
      * ex; "Seminars not complete - send review email"
      * And triggers the notification
      *
@@ -612,384 +646,143 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
             }
         }
 
-        /**
-
-        $id = $alert->getKeyIdFromAlertId($project_id, $alert_id);
-        $send_alert = $alerts[$alert_id];
-        //$this->emDebug($send_alert); exit;
-
-        $foo = $alert->sendNotification($send_alert['alert_id'],$project_id, $record, $event_id, $instrument);
-        $this->emDebug("SENT: ", $foo);
-            return;
-*/
         return;
     }
 
-    public function sendNotification($alert_type, $record, $event_id, $instrument, $instance,$modify = false, $new_link = null ) {
-        $alert_type = 'TemplateSurvey';
-        $modify = true;
 
-        $project_id = $this->getProjectId();
-
-        $alert = new Alerts();
-        $alerts = $alert->getAlertSettings($project_id);
-
-        $alert_id = 20;
-        $id = $alert->getKeyIdFromAlertId($project_id, $alert_id);
-        $this_alert = $alerts[$alert_id];
-
-
-        if ($modify === true) {
-            $alert->sendNotification($this_alert['alert_id'],$project_id, $record, $event_id, $instrument);
-            return;
-        }
-
-        //this is copy of sendNotification
-        $email_subject = $alert->getAlertSetting("email-subject", $project_id)[$id];
-        $alert_message = $alert->getAlertSetting("alert-message", $project_id)[$id];
-        $alert_type = $alert->getAlertSetting("alert-type", $project_id)[$id];
-        $prevent_piping_identifiers = $alert->getAlertSetting("prevent-piping-identifiers", $project_id)[$id];
-
-
-        $this->emDebug();
-        $this->emDebug($id, $this_alert['alert_title'], $alert_message);
-
-        // Set project and get data (if needed)
-        $Proj = new \Project($project_id);
-        $repeat_instrument = $Proj->isRepeatingForm($event_id, $instrument) ? $instrument : "";
-        $isLongitudinal = $Proj->longitudinal;
-        if (empty($data)) {
-            $data = \Records::getData($project_id, 'array', $record);
-        }
-        $alertSentSuccesfully = false; // default
-        $alertInstrument = $alert->getAlertSetting("form-name", $project_id)[$id];
-        $alertEventId = $alert->getAlertSetting("form-name-event", $project_id)[$id];
-        if (($alertInstrument == '' || $alertEventId == '') && is_numeric($event_id)) $alertEventId = $event_id;
-        if ($alertEventId == '') $alertEventId = $Proj->firstEventId;
-        $alertInstance = ($alertInstrument == '') ? 1 : $instance;
-
-        //replace our key with the new link
-
-
-        // Piping
-        $alert_message = \Piping::replaceVariablesInLabel($alert_message, $record, $event_id, $instance, $data,false,
-                                                         $project_id, false, $repeat_instrument, 1, false, false, $instrument, null, false, $prevent_piping_identifiers);
-        $email_subject = \Piping::replaceVariablesInLabel($email_subject, $record, $event_id, $instance, $data,false,
-                                                         $project_id, false, $repeat_instrument, 1, false, false, $instrument, null, false, $prevent_piping_identifiers);
-
-
-
-
-    }
-
-    public function setupMessage() {
-// Initialize values (even if we aren't sending via EMAIL)
-        $mail = new \Message();
-        // Email Addresses
-        $mail = $this->setEmailAddresses($mail, $project_id, $record, $event_id, $instrument, $instance, $id, $data);
-
-        // Email From: Get the Reply-To and Display Name for this message
-        $fromDisplayName = trim($this->getAlertSetting("email-from-display", $project_id)[$id]);
-        $email_from = trim($this->getAlertSetting("email-from", $project_id)[$id]);
-        if (!empty($email_from)) {
-            if (!isEmail($email_from)) {
-                $email_from = Piping::replaceVariablesInLabel($email_from, $record, $event_id, $instance, $data,false,
-                                                              $project_id, false, $repeat_instrument, 1, false, false, $instrument);
-            }
-            if (isEmail($email_from)) {
-                // Set From and From Name
-                $mail->setFrom($email_from);
-                $mail->setFromName($fromDisplayName);
-            } else {
-                $this->sendFailedEmailRecipient($this->getAlertSetting('email-failed', $project_id), $lang['alerts_55'], $lang['alerts_57']." ($email_from in Project: $project_id, Record: $record, Alert #{$id})");
-            }
-        } else {
-            $this->sendFailedEmailRecipient($this->getAlertSetting('email-failed', $project_id), $lang['alerts_56'], $lang['alerts_58']." ($email_from in Project: $project_id, Record: $record, Alert #{$id})");
-        }
-
-        // Body and subject
-        $mail->setBody($alert_message);
-        $mail->setSubject($email_subject);
-        // Embedded images
-        $mail = $this->setEmbeddedImages($mail, $project_id);
-        // Attachments
-        $mail = $this->setAttachments($mail, $project_id, $id);
-        // Attchment from field variable
-        $mail = $this->setAttachmentsREDCapVar($mail, $project_id, $data, $record, $event_id, $instrument, $instance, $id, $isLongitudinal);
-    }
+        /*******************************************************************************************************************/
+        /* EM HELPER METHODS                                                                                                      */
+        /***************************************************************************************************************** */
 
     /**
-     * Create a new instance of the repeating exam event and set the mode
+     * Helper method to create a new instance in Recertification mode
+     * Offset dates added
+     * Admin form ('admin') fields  reset to new dates
      *
      * @param $record
-     * @param $event
-     * @throws \Exception
+     * @param $repeat_event
+     * @param $next_id
+     * @param $exam_date
      */
-    public function resetInstance($record, $event) {
+    function resetInstanceToRecertify($record, $repeat_event, $next_id, $exam_date) {
+        //create a new instance with mode = 0 (certification) or mode = 1 (recertification)
 
+        $expiry_date = $this->getOffsetDate($exam_date, $this->getProjectSetting('final-exam-to-expiry-offset'));
+        $grace_pd_date = $this->getOffsetDate($expiry_date, 30);
 
-
-        $exam_event = $this->getProjectSetting('exam-event');
-        $repeating_instrument = 'recertification_form';
-        $recert_status = 'recertify_status';
-
-        //get the latest seminar form
-        $rf = new RepeatingForms($this->getProjectId(), $repeating_seminar_instrument);
-        $rf->loadData($record, $exam_event, null);
-
-        //get the last instance
-
-
-        $last_instance_id = $rf->getLastInstanceId($record,$exam_event);
-        $this->emDebug("record is $record last instance id is $last_instance_id / project id ".$this->getProjectId() . " event is $exam_event");
-        $last_instance = $rf->getInstanceById($record, $last_instance_id, $exam_event);
-        $this->emDebug("last instanced is $last_instance_id and $recert_status");
-
-        //check that the instance is approved for certification
-        if ($last_instance[$recert_status]  === '1') {
-            $next_id = $rf->getNextInstanceId($record,$exam_event);
-            $this->emDebug("next id is $next_id");
-
-            //create new instance with today being the start date and all the offsets
-            $mode = 1; //recertifying  (0 = certify)
-            $today = new DateTime();
-            $this->updateEndDate($record, $today->format('Y-m-d'), $exam_event, $next_id, 1);      //this wil
-        }
-
-    }
-
-
-
-    /*******************************************************************************************************************/
-    /* EM METHODS                                                                                                      */
-    /***************************************************************************************************************** */
-
-    /**
-     * Get the Exam Date of a PASSED exam date.
-     * If exam failed, then return FALSE
-     *
-     * @param $record
-     * @param $event
-     * @return array|bool
-     */
-    function getExamDate($record, $event,$repeat_instance) {
-
-        $final_exam_date_field          = $this->getProjectSetting('final-exam-date-field');
-        $date_exam_1_field              = $this->getProjectSetting('date-exam-1-field');
-        $exam_status_1_field            = $this->getProjectSetting('exam-status-1-field');
-
-        $params = array(
-            'return_format'       => 'json',
-            'records'             => $record,
-            'fields'              => array($final_exam_date_field,$date_exam_1_field, $exam_status_1_field),
-            'events'              => $event,
-//                'redcap_repeat_instrument' => $instrument,       //this doesn't restrict
-            'redcap_repeat_instance'   => $repeat_instance   //this doesn't seem to do anything!
+        $data = array(
+            REDCap::getRecordIdField()                                    => $record,
+            'redcap_event_name'                                           => REDCap::getEventNames(true, false, $repeat_event),
+            'redcap_repeat_instance'                                      => $next_id,
+            $this->getProjectSetting('certify-recertify-mode-field') => 1, //recertify mode
+            $this->getProjectSetting('final-exam-date-field')        => $exam_date,
+            $this->getProjectSetting('expiry-date-field')     => $expiry_date,
+            $this->getProjectSetting('fup-survey-6-mo-field') => $this->getOffsetDate($exam_date, 180),
+            $this->getProjectSetting('fup-survey-1-yr-field') => $this->getOffsetDate($exam_date, 365),
+            $this->getProjectSetting('rem-expiry-6-mo-field') => $this->getOffsetDate($expiry_date, -180),
+            $this->getProjectSetting('rem-expiry-1-mo-field') => $this->getOffsetDate($expiry_date, -30),
+            $this->getProjectSetting('grace-pd-30-day-field') => $grace_pd_date
         );
 
-        $q = REDCap::getData($params);
-        $records = json_decode($q, true);
+        $response = REDCap::saveData('json', json_encode(array($data)));
 
-        $target_data = $records[0];
-
-        //Adding redcap_repeat_instance in getData  does NOT seem to limit the getData to this instance
-        foreach ($records as $cand) {
-            if ($cand['redcap_repeat_instance'] == $repeat_instance) {
-                //$this->emDebug("Found instance ". $repeat_instance, $cand);
-                $target_data = $cand;
-                continue;
-            }
-        }
-
-        //$this->emDebug($params,$results, count(array_filter($results[0])));
-
-        //nothing set, do nothing,  we are done return false
-        if (count(array_filter($target_data)) < 1) {
-            return false;
-        }
-
-        //if final_exam_date_field is populated, do nothing, return false
-        if (!empty($target_data[$final_exam_date_field])) {
-            $this->emDebug("Final exam date already set. Do nothing",$results[0][$final_exam_date_field]);
-            return false;
-        }
-
-        //$this->emDebug($results[0][$exam_status_1_field],$results[0][$exam_status_2_field],$results[0][$exam_status_3_field]);
-        //$this->emDebug($results[0][$date_exam_1_field],$results[0][$date_exam_2_field],$results[0][$date_exam_3_field]);
-
-        $final_exam_date = '';
-        if (($target_data[$exam_status_1_field]!=='1')) {
-            $this->emDebug("Exam not passed. Do nothing");
-            return false;
+        if ($response['errors']) {
+            $msg = "Error while trying to save dates to repeating event.";
+            $this->emError($response['errors'], $data, $msg);
         } else {
-            $final_exam_date = $target_data[$date_exam_1_field];
-            $this->emDebug("FINAL Exam date is $final_exam_date");
+            $this->emDebug("Successfully saved date data.");
         }
-        return $final_exam_date;
-    }
 
-    /**
-     * Pre-create the fup survey urls and store them in fields to be sent out in the emails
-     * If the fields already exist, it will not recreate them.
-     *
-     * @param $record
-     * @param $event
-     * @param $repeat_instance
-     */
-    function getFUPSurveyURLs($record, $repeat_instance) {
-        //check that the URLs aren't already populated
-        $survey_one_field = $this->getProjectSetting('fup-survey-url-1-field');
-        $survey_two_field = $this->getProjectSetting('fup-survey-url-2-field');
-        $survey_fields = array($this->getProjectSetting('fup-survey-url-1-field'),$this->getProjectSetting('fup-survey-url-2-field'));
-
-        $event = $this->getProjectSetting('application-event');
-
-        $params  = array(
-            'return_format' => 'json',
-            'records'        => $record,
-            'events'        =>  $event,
-            'fields'        => array( $survey_one_field, $survey_two_field)
+        //also save to the admin event to reflect the latest status
+        $admin_data = array(
+            REDCap::getRecordIdField() => $record,
+            'redcap_event_name' => REDCap::getEventNames(true, false, $this->getProjectSetting('application-event')),
+            'cert_mode'  => 1,
+            'cert_start' => $exam_date,
+            'cert_end'   => $expiry_date,
+            'cert_grace_pd_end' => $grace_pd_date
         );
 
-        $q = REDCap::getData($params);
-        $records = json_decode($q, true);
-        //$this->emDebug("Record is $record", $params,$records, array_keys($records), $records[0], $records[0]['fup_survey_1_url']);
+        $response = REDCap::saveData('json', json_encode(array($admin_data)));
 
-        foreach ($survey_fields as $survey_field) {
-            $this->emDebug($survey_field, $records[$survey_field], empty($records[0][$survey_field]),isset($records[0][$survey_field]));
-
-            if (empty($records[0][$survey_field])) {
-                //$rf = new RepeatingForms($this->getProjectId(), $this->getProjectSetting('fup-survey-form'));
-                $rf = RepeatingForms::byForm($this->getProjectId(), $this->getProjectSetting('fup-survey-form'));
-
-                //pre create the survey
-                $next_instance = $rf->getNextInstanceId($record, $this->getProjectSetting('application-event'));
-
-                if ($rf->last_error_message) {
-                    $this->emError("Record $record: There was an error: ", $rf->last_error_message);
-                    return false;
-                }
-
-                $url =  $rf->getSurveyUrl($record,$next_instance);
-                $this->emDebug("next _instance is $next_instance", $url);
-
-                // Get the survey url for that instance
-                $data[$this->getProjectSetting('fup-survey-url-1-field')] = $rf->getSurveyUrl($record,$next_instance);
-            }
+        if ($response['errors']) {
+            $msg = "Error while trying to save dates to admin event.";
+            $this->emError($response['errors'], $admin_data, $msg);
+        } else {
+            $this->emDebug("Successfully saved admin date data.");
         }
-
-        exit;
-        //$rf = new RepeatingForms($this->getProjectId(), $this->getProjectSetting('fup-survey-form'));
-        $rf = RepeatingForms::byForm($this->getProjectId(), $this->getProjectSetting('fup-survey-form'));
-        if (!isset($rf)) {
-            $this->emDebug("Is this project setting set for fup-survey-form?");
-            return false;
-        }
-
-        //if $survey_one_field is empty, set it
-        if (empty($records[0][$survey_one_field])) {
-            //pre create the survey
-            $next_instance = $rf->getNextInstanceIdForceReload($record, $this->getProjectSetting('application-event'));
-
-
-            $this->emDebug($rf->last_error_message, $record, $next_instance);
-
-            // Get the survey url for that instance
-            $data[$this->getProjectSetting('fup-survey-url-1-field')] = $rf->getSurveyUrl($record,$next_instance);
-        }
-
-        //if $survey_two_field is empty, set it a year from exam date
-        if (empty($records[0][$survey_two_field])) {
-            //pre create the survey
-            $next_instance = $rf->getNextInstanceIdForceReload($record, $this->getProjectSetting('application-event'));
-            $this->emDebug($rf->last_error_message, $record, $next_instance);
-
-            // Get the survey url for that instance
-            $data[$this->getProjectSetting('fup-survey-url-2-field')] = $rf->getSurveyUrl($record,$next_instance);
-        }
-
-        $this->emDebug($data);
-exit;
-        return($data);
-
     }
 
     /**
-     * Given a start_date and and offset, set the end_date into the target_field
+     * Helper method to create a new instance in Certification mode
+     * Admin form ('admin') fields  reset to NO dates
      *
      * @param $record
+     * @param $repeat_event
+     * @param $next_id
+     */
+    function resetInstanceToCertify($record, $repeat_event, $next_id) {
+        //create a new instance with mode = 0 (certification) or mode = 1 (recertification)
+        $data = array(
+            REDCap::getRecordIdField() => $record,
+            'redcap_event_name' => REDCap::getEventNames(true, false, $repeat_event),
+            'redcap_repeat_instance' => $next_id,
+            $this->getProjectSetting('certify-recertify-mode-field') => 0 //certify mode
+        );
+
+        //save the data
+        $response = REDCap::saveData('json', json_encode(array($data)));
+
+        if ($response['errors']) {
+            $msg = "Error while trying to save dates to repeating event.";
+            $this->emError($response['errors'], $data, $msg);
+        } else {
+            $this->emDebug("Successfully saved date data.");
+            $this->emDebug($response, $data);
+        }
+
+        //also save to the admin event to reflect the latest status
+        $admin_data = array(
+            REDCap::getRecordIdField() => $record,
+            'redcap_event_name' => REDCap::getEventNames(true, false, $this->getProjectSetting('application-event')),
+            'cert_mode' => 0,
+            'cert_start' => '',
+            'cert_end' => '',
+            'cert_grace_pd_end' => ''
+        );
+
+        $response = REDCap::saveData('json', json_encode(array($admin_data)), 'overwrite');
+
+        if ($response['errors']) {
+            $msg = "Error while trying to save dates to admin event.";
+            $this->emError($response['errors'], $admin_data, $msg);
+        } else {
+            $this->emDebug("Successfully saved admin date data.");
+            $this->emDebug($response, $admin_data);
+        }
+    }
+
+
+    /**
+     * Helper method to calculate dates from offset
      * @param $start_date
      * @param $offset
-     * @param $target_field
-     * @param $target_event
+     * @return string
+     * @throws \Exception
      */
-    function updateEndDate($record, $exam_date, $target_event, $repeat_instance, $mode = 0) {
+    public function getOffsetDate($start_date, $offset)
+        {
+            $this->emDebug("Start date is $start_date with $offset");
+            $end_date = new DateTime($start_date);
+            $di = new DateInterval('P' . abs($offset) . 'D');
 
-        $this->emDebug("Updating end date for $record / exama-date:  $exam_date / target_dtae:  $target_event" );
-
-        if (!empty($exam_date)) {
-
-            //save the date
-            $data = array(
-                REDCap::getRecordIdField()                             => $record,
-                'redcap_event_name'                                    => REDCap::getEventNames(true, false,$target_event),
-                'redcap_repeat_instance'                               => $repeat_instance,
-                $this->getProjectSetting('final-exam-date-field') => $exam_date
-            );
-
-            $expiry_date = $this->getOffsetDate($exam_date,$this->getProjectSetting('final-exam-to-expiry-offset'));
-            $data[$this->getProjectSetting('expiry-date-field')] =$expiry_date;
-            $data[$this->getProjectSetting('fup-survey-6-mo-field')] = $this->getOffsetDate($exam_date,180);
-            $data[$this->getProjectSetting('fup-survey-1-yr-field')] = $this->getOffsetDate($exam_date,365);
-
-            $data[$this->getProjectSetting('rem-expiry-6-mo-field')] = $this->getOffsetDate($expiry_date,-180);
-            $data[$this->getProjectSetting('rem-expiry-1-mo-field')] = $this->getOffsetDate($expiry_date,-30);
-            $data[$this->getProjectSetting('grace-pd-30-day-field')] = $this->getOffsetDate($expiry_date,30);
-            $data[$this->getProjectSetting('certify-recertify-mode-field')] = $mode;
-
-            REDCap::saveData($data);
-            $response = REDCap::saveData('json', json_encode(array($data)));
-
-            if ($response['errors']) {
-                $msg = "Error while trying to save dates to repeating event.";
-                $this->emError($response['errors'], $data, $msg);
-            } else {
-                $this->emDebug("Successfully saved date data.");
+            if ($offset < 0) {
+                $di->invert = 1; // Proper negative date interval
             }
-
-            //also save to the admin event to reflect the latest status
-            $admin_data = array(
-                REDCap::getRecordIdField()                             => $record,
-                'redcap_event_name'                                    => REDCap::getEventNames(true, false,$this->getProjectSetting('application-event')),
-                'cert_status' => $mode,
-                'cert_start'  => $exam_date,
-                'cert_end'  => $expiry_date
-            );
-
-            REDCap::saveData($admin_data);
-            $response = REDCap::saveData('json', json_encode(array($admin_data)));
-
-            if ($response['errors']) {
-                $msg = "Error while trying to save dates to admin event.";
-                $this->emError($response['errors'], $admin_data, $msg);
-            } else {
-                $this->emDebug("Successfully saved admin date data.");
-            }
+            $end_date->add($di);
+            //$this->emDebug("Start date is $start_date with $offset . and end date ".$end_date->format('Y-m-d'));
+            return $end_date->format('Y-m-d');
         }
-    }
-
-    function getOffsetDate($start_date, $offset) {
-        $this->emDebug("Start date is $start_date with $offset");
-        $end_date = new DateTime($start_date);
-        $di = new DateInterval('P'.abs($offset).'D');
-
-        if ($offset < 0) {
-            $di->invert = 1; // Proper negative date interval
-        }
-        $end_date->add($di);
-        //$this->emDebug("Start date is $start_date with $offset . and end date ".$end_date->format('Y-m-d'));
-        return $end_date->format('Y-m-d');
-    }
 
 
     public function findRecordFromSUNet($id, $target_event = NULL) {
@@ -999,7 +792,7 @@ exit;
         $target_id_field = "webauth_user";
         $firstname_field = "first_name";
         $lastname_field  = "last_name";
-        $cert_status     = "cert_status";
+        $cert_mode       = "cert_mode";
         $cert_start      = "cert_start";
         $cert_end        = "cert_end";
         $date_start_field = "st_date_seminar_start";
@@ -1022,7 +815,7 @@ exit;
         $params = array(
             'return_format' => 'json',
             'events'        =>  $target_event,
-            'fields'        => array( REDCap::getRecordIdField(), $firstname_field, $lastname_field, $cert_status, $cert_start, $cert_end),
+            'fields'        => array( REDCap::getRecordIdField(), $firstname_field, $lastname_field, $cert_mode, $cert_start, $cert_end),
             'filterLogic'   => $filter
         );
 
@@ -1036,6 +829,13 @@ exit;
 
     }
 
+    /**
+     * Get the data from the seminar / trainings and render as table
+     *
+     * @param $instance
+     * @return string
+     * @throws \Exception
+     */
     public function getLatestSeminars($instance) {
         $instrument = 'seminars_trainings';
         $htm  = '';
@@ -1108,6 +908,13 @@ exit;
     }
 
 
+    /**
+     * Get the data from the recertification and render as table
+     *
+     * @param $instance
+     * @return string
+     * @throws \Exception
+     */
     public function getRecertification($instance) {
         $instrument = 'recertification_form';
         $htm  = '';
@@ -1155,7 +962,14 @@ exit;
     }
 
 
-
+    /**
+     *
+     * @param $date
+     * @param $text
+     * @param $coded
+     * @return array
+     * @throws \Exception
+     */
     public function setupSaveData($date, $text, $coded) {
 
 
