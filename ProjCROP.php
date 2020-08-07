@@ -15,9 +15,12 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
     use emLoggerTrait;
 
+    //These are the fields to be displayed for the certification form
+    //TODO: convert this to use the EM config
     var $portal_fields = array(
         "st_date_hipaa",
         "st_date_citi",
+        "st_citi_file",
         "st_date_clin_trials",
         "st_date_ethics",
         "st_date_irb_report",
@@ -25,7 +28,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         "st_date_resources",
         "st_date_consent",
         "st_date_irb",
-        array("st_budgeting","st_date_budgeting"),
+        "st_date_budgeting",
         "st_date_billing",
         "st_date_regulatory",
         "st_date_startup",
@@ -33,9 +36,9 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         "st_date_rsrch_phase",
         array("st_oncore","st_date_oncore"),
         array("elective_1","elective_1_date"),
-       array("elective_2", "elective_2_date"),
+        array("elective_2", "elective_2_date"),
         array("elective_3","elective_3_date"),
-       array("elective_4", "elective_4_date")
+        array("elective_4", "elective_4_date")
     );
 
     var $recert_fields = array(
@@ -830,6 +833,25 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
     }
 
     /**
+     * Change request: 7/22
+     * They want to be able to change the exam dates
+     * @param $instance
+     */
+    public function getExamDates($instance) {
+        $instrument = 'seminars_trainings';
+        $htm = '';
+
+        $dict = REDCap::getDataDictionary($this->getProjectId(),'array', false, null, $instrument);
+        $selections_str = $dict['st_requested_exam']['select_choices_or_calculations'];
+        $selections = explode("|", $selections_str);
+        foreach ($selections as $str) {
+            $val = explode(",", $str);
+            $htm .= "<option value='{$val[0]}'> {$val[1]} </option>";
+        }
+        return $htm;
+    }
+
+    /**
      * Get the data from the seminar / trainings and render as table
      *
      * @param $instance
@@ -844,20 +866,23 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         //$this->emDebug($instance);
 
         foreach ($this->portal_fields as $field) {
+            $field_type = null;
 
 
             if (!is_array($field)) {
                 $field_label = $dict[$field]['field_label'];
+                $field_type = $dict[$field]['field_type'];
                 $field_value = $instance[$field];
                 $field_id = $field;
             } else {
 
                 $field_label = $dict[$field[0]]['field_label'];
+                $field_type = $dict[$field[0]]['field_type'];
 
                 $field_value = $instance[$field[1]];
                 $field_id = $field[1];
 
-                if ($dict[$field[0]]['field_type'] === 'dropdown') {
+                if ($field_type === 'dropdown') {
 
                     $selected = trim($instance[$field[0]]);
 
@@ -882,17 +907,41 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
                 //handle free text fields that aren't dates
                 //if (($dict[$field]['field_type'] == 'text') && ($dict[$field]['text_validation_type_or_show_slider_number'] !== 'date_ymd')) {
-                if (($dict[$field[0]]['field_type'] == 'text') && (strpos($field[0], 'elective_') === 0)) {
+                if (($field_type == 'text') && (strpos($field[0], 'elective_') === 0)) {
 
                     //$field_elective_label = substr($field[0], 0, -5);
                     $field_elective_value = $instance[$field[0]];
                     $field_label = "<input id='{$field[0]}' type='text' class='form-control elective' value='{$field_elective_value}' placeholder='Please enter {$field_label}'/> ";
                 }
+
             }
 
-            $htm .= '<tr><td>'
-                .$field_label.
-                "</td>
+            //change request: 7/22: add an file upload
+            if ($field == "st_citi_file") {
+                if (!empty($field_value)) {
+                    //a file has already been uploaded
+                    $upload_inst = "File already uploaded. Choose file to upload another file.";
+                } else {
+                    $upload_inst = "File not yet uploaded.";
+                }
+
+                $htm .= '<tr><td>' . $field_label .
+                    "</td>
+                  <td>
+
+                    <span>{$upload_inst}</span>
+                  <div class='form-control upload'>                                      
+                  <input type='file'   name='{$field}' id='{$field}' placeholder='{$upload_inst}'>
+                  <input type='submit' name='upload_file' id='upload_file' data_field='{$field}' value='Upload File'>
+                  </div>
+                 
+                  </td>
+                  </tr>";
+
+            } else {
+                $htm .= '<tr><td>'
+                    . $field_label .
+                    "</td>
                   <td>
                       <div class='input-group date'  >
                           <input id='{$field_id}' type='text' class='form-control dt' value='{$field_value}' placeholder='yyyy-mm-dd'/>
@@ -902,6 +951,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
                       </div>
                   </td>
               </tr>";
+            }
         }
 
         return $htm;

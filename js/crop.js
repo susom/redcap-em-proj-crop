@@ -31,6 +31,9 @@
             $('#complete').show();
         }
 
+        //bind button to uploadFile
+        $('#upload_file').on('click', crop.uploadFile);
+
         //bind button to save Form
         $('#save_form').on('click', crop.saveForm);
 
@@ -39,6 +42,27 @@
 
         //bind button to save Form
         $('#recertify').on('click', crop.recertify);
+    };
+
+    crop.uploadFile = function() {
+
+        console.log("uploading file...");
+
+        var formData = new FormData();
+        formData.append('file', $('#st_citi_file')[0].files[0]);
+        formData.append('upload_field', 'st_citi_file');
+
+
+        $.ajax({
+            type : 'POST',
+            data : formData,
+            processData: false,  // tell jQuery not to process the data
+            contentType: false,  // tell jQuery not to set contentType
+            success : function(data) {
+                console.log(data);
+                alert(data);
+            }
+        })
     };
 
     crop.saveForm = function() {

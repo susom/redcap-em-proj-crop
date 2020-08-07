@@ -10,7 +10,7 @@ use REDCap;
 $module->emDebug("Starting CROP landing page for project $pid");
 
 $sunet_id = $_SERVER['WEBAUTH_USER'];
-//$sunet_id = 'bix5';
+//$sunet_id = 'zinc';
 
 //if sunet ID not set leave
 if (!isset($sunet_id)) {
@@ -107,6 +107,44 @@ if (isset($_POST['schedule'])) {
 
 }
 
+if (isset($_FILES['file'])) {
+    $module->emDebug("Handling upload file");
+    //todo: ask about checking files
+    $file = fopen($_FILES['file']['tmp_name'], 'r');
+    $file_name = $_FILES['file']['name'];
+    $file_type = $_FILES['file']['type'];
+    $field_name = $_POST['upload_field'];
+
+    $edoc_id = $module->saveFile($_FILES['file']['tmp_name']);
+
+    $upload_data = array(
+        $field_name => $edoc_id
+    );
+
+    $save_status = $rf->saveInstance($record, $upload_data, $last_instance, $exam_event);
+
+    if ($save_status == false) {
+        $module->emDebug("Error saving : ". $rf->last_error_message);
+        $result = array(
+            'result' => 'fail',
+            'msg' => 'There was an error uploading the file Please notify your admin.'
+        );
+    } else {
+        $module->emDebug("Success saving : ". $rf->last_error_message);
+        $result = array(
+            'result' => 'success',
+            'msg' => 'Your file has been uploaded. Verification process can be started once all dates are entered.'
+        );
+    }
+
+    header('Content-Type: application/json');
+    print json_encode($result);
+    exit();
+
+
+}
+
+
 if (isset($_POST['recertify'])) {
     $module->emDebug("Handling recertification");
 
@@ -162,7 +200,7 @@ if (isset($_POST['save_form'])) {
                 'msg' => 'There was an error saving the form. Please notify your admin.'
             );
     } else {
-        $module->emDebug("Success saving : ". $rf->last_error_message);
+        $module->emDebug("Success saving ");
         $result = array(
             'result' => 'success',
             'msg' => 'Your form has been saved. Verification process can be started once  all dates are entered.'
