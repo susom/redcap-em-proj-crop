@@ -37,29 +37,8 @@ namespace Stanford\ProjCROP;
                 <h6>Expiry Date: <?php echo $cert_end ?></h6>
             </div>
         </div>
-        <div class="form-row">
-            <div class="form-group col-md-6"><h6>Have you changed positions since certification?</h6>
-            </div>
-            <div class="form-group col-md-6">
-                <label><input name="rf_position_change" id="rf_position_change" type="radio" value="1"> Yes</label><br>
-                <label><input name="rf_position_change" id="rf_position_change" type="radio" value="0"> No</label>
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group col-md-6"><p>If yes, what was your title/department at initial certification date?</p>
-            </div>
-            <div class="form-group col-md-4">
-                <input name="rf_title_at_cert" id='rf_title_at_cert' type='text' class="form-control" autocomplete="off"/>
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group col-md-2">
-                <label for="last_name">Signature</label>
-            </div>
-            <div class="form-group col-md-6">
-                <input type="text" class="form-control" id="rf_signature" placeholder="">
-            </div>
-        </div>
+        <?php echo $module->getRecertificationGenInfo($instance); ?>
+
         <hr>
         <h4>Section B: Seminars / Trainings</h4>
         <h5>Please enter the following information in the following table</h5>

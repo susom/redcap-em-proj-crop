@@ -10,7 +10,7 @@ use REDCap;
 $module->emDebug("Starting CROP landing page for project $pid");
 
 $sunet_id = $_SERVER['WEBAUTH_USER'];
-//$sunet_id = 'zinc';
+//$sunet_id = 'umlaut';
 
 //if sunet ID not set leave
 if (!isset($sunet_id)) {
@@ -53,7 +53,7 @@ $rf = new RepeatingForms($pid, $repeating_seminar_instrument);
 $rf->loadData($record, null, null);
 //$data = $rf->getAllInstances($record, null);
 
-$exam_event = $module->getProjectSetting('exam-event');
+$exam_event = $module->framework->getProjectSetting('exam-event');
 $last_instance = $rf->getLastInstanceId($record,$exam_event);
 
 
@@ -113,7 +113,9 @@ if (isset($_FILES['file'])) {
     $file = fopen($_FILES['file']['tmp_name'], 'r');
     $file_name = $_FILES['file']['name'];
     $file_type = $_FILES['file']['type'];
-    $field_name = $_POST['upload_field'];
+    //$field_name = $_POST['upload_field'];
+    //hard code field name to ct_
+    $field_name = 'st_citi_file';
 
     $edoc_id = $module->saveFile($_FILES['file']['tmp_name']);
 
@@ -121,7 +123,20 @@ if (isset($_FILES['file'])) {
         $field_name => $edoc_id
     );
 
-    $save_status = $rf->saveInstance($record, $upload_data, $last_instance, $exam_event);
+    //This doesn't seem to work
+    //$save_status = $rf->saveInstance($record, $upload_data, $last_instance, $exam_event);
+
+    $data = array(
+        REDCap::getRecordIdField() => $record,
+        'redcap_event_name' => REDCap::getEventNames(true, false, $exam_event),
+        'redcap_repeat_instance' => $last_instance,
+        //$field_name => $edoc_id,
+        'st_citi_file' => $edoc_id,
+        'st_oncore_comments' => "HELLO23". $edoc_id . " , " . $field_name
+    );
+
+    //save the data
+    $save_status = REDCap::saveData('json', json_encode(array($data)));
 
     if ($save_status == false) {
         $module->emDebug("Error saving : ". $rf->last_error_message);
@@ -131,6 +146,14 @@ if (isset($_FILES['file'])) {
         );
     } else {
         $module->emDebug("Success saving : ". $rf->last_error_message);
+        REDCap::logEvent(
+            "File uploaded by CROP EM",  //action
+            "Success uploading file $file_name to field $field_name.", //change msg
+            NULL, //sql optional
+            $record, //record optional
+            $exam_event, //event optional
+            $module->getProjectId() //project ID optional
+        );
         $result = array(
             'result' => 'success',
             'msg' => 'Your file has been uploaded. Verification process can be started once all dates are entered.'

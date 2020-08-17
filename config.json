@@ -7,6 +7,8 @@
 
 	"documentation": "README.md",
 
+	"framework-version": 5,
+
 	"authors": [
 		{
 			"name": "Jae Lee",
@@ -73,6 +75,48 @@
 			"type": "checkbox"
 		},
 		{
+			"key": "log-send-desc",
+			"name": "<div class='alert alert-success'><h3 class='text-center'>Settings for email send logs and timestamps</h3><br>Fields use to log timestamps of alerta sent</div>",
+			"required": false,
+			"type": "descriptive"
+		},
+		{
+			"key": "allow-multiple-emails",
+			"name": "<b>Allow multiples emails sent to learners / admin on a single day.  If unchecked, learners and admin will only receive a single email a day.</i>",
+			"required": false,
+			"type": "checkbox"
+		},
+		{
+			"key": "last-alert-template-sent-field",
+			"name": "<b>ADMIN: Last Alert Template Field</b><br>Select Field to log last Alert Template sent",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "alert-sent-timestamp-field",
+			"name": "<b>ADMIN: Date stamp of last notification sent</b><br>Select Field to log timestamp of last alert sent from admin. Field in Admin Review form (ex: resend_date_stamp",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "certify-request-sent-timestamp-field",
+			"name": "<b>LEARNER: Date stamp of verification request sent</b><br>Select Field to log timestamp of last verification request from learner. Field in Admin Review form (ex: ts_ready_exam_notify",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "recertify-request-sent-timestamp-field",
+			"name": "<b>LEARNER: Date stamp of recertification request sent</b><br>Select Field to log timestamp of last recertification request from learner. Field in Admin Review form (ex: rf_ts_recertify_notify",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "form-desc",
+			"name": "<div class='alert alert-success'><h3 class='text-center'>FORMS</h3><br>Select Events and Forms used</div>",
+			"required": false,
+			"type": "descriptive"
+		},
+		{
 			"key": "application-event",
 			"name": "<b>Application Event</b><br>Select Event of the Application form",
 			"required": false,
@@ -115,12 +159,6 @@
 			"type": "form-list"
 		},
 		{
-			"key": "last-alert-template-sent-field",
-			"name": "<b>Last Alert Template Field</b><br>Select Field to log last Alert Template sent",
-			"required": false,
-			"type": "field-list"
-		},
-		{
 			"key": "date-exam-1-field",
 			"name": "<b>Exam Date Field</b><br>Select Field for exam date",
 			"required": false,
@@ -139,8 +177,8 @@
 			"type": "field-list"
 		},
 		{
-			"key": "final-exam-date-field",
-			"name": "<b>Final Exam Date field</b><br>Select field for the Final Exam Date",
+			"key": "recertify-start-date-field",
+			"name": "<b>Start of Recertify Date field</b><br>Select field for the Final Exam Date or end of previous Certification",
 			"required": false,
 			"type": "field-list"
 		},
@@ -197,6 +235,54 @@
 			"name": "<b>30 Day Grace Period Date Field</b><br>Select field for the 30 day Grace Period date",
 			"required": false,
 			"type": "field-list"
+		},
+		{
+			"key": "email-template-desc",
+			"name": "<div class='alert alert-success'><h3 class='text-center'>Email Templates from Alerts and Notifications</h3><br>Some alerts are being used as templates to allow multiple resends.</div>",
+			"required": false,
+			"type": "descriptive"
+		},
+		{
+			"key": "template-schedule-exam",
+			"name": "Email Template - Name of Alert to schedule exam",
+			"required": false,
+			"type": "text"
+		},
+		{
+			"key": "template-seminar-incomplete",
+			"name": "Email Template - Name of Alert to notify learner that seminar form is incomplete",
+			"required": false,
+			"type": "text"
+		},
+		{
+			"key": "template-send-exam-date",
+			"name": "Email Template - Name of Alert to send exam date",
+			"required": false,
+			"type": "text"
+		},
+		{
+			"key": "template-send-exam-status",
+			"name": "Email Template - Name of Alert to send exam status",
+			"required": false,
+			"type": "text"
+		},
+		{
+			"key": "template-check-recertification",
+			"name": "Email Template - Name of Alert to notify admin that learner is ready to check recertification",
+			"required": false,
+			"type": "text"
+		},
+		{
+			"key": "template-recertification-incomplete",
+			"name": "Email Template - Name of Alert to notify learner that recertification form is incomplete",
+			"required": false,
+			"type": "text"
+		},
+		{
+			"key": "template-expiration-letter",
+			"name": "Email Template - Name of Alert to notify learner that certification has expired and that they need to restart the certification process",
+			"required": false,
+			"type": "text"
 		}
 	],
 	"compatibility": {

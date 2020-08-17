@@ -50,7 +50,7 @@
 
         var formData = new FormData();
         formData.append('file', $('#st_citi_file')[0].files[0]);
-        formData.append('upload_field', 'st_citi_file');
+        //formData.append('upload_field', 'st_citi_file');
 
 
         $.ajax({
@@ -81,6 +81,10 @@
 
         let codedValues = {};
         $('.form-control.select').each(function () {
+            codedValues[$(this).attr("id")] = $(this).val();
+        });
+
+        $("input[type='radio']:checked").each(function ()  {
             codedValues[$(this).attr("id")] = $(this).val();
         });
 
