@@ -7,6 +7,7 @@ use DateTime;
 use REDCap;
 use ExternalModules\ExternalModules;
 use Alerts;
+use Files;
 
 require_once 'emLoggerTrait.php';
 require_once 'src/RepeatingForms.php';
@@ -899,6 +900,102 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
 
     /**
+     * Cribbed from file_upload.php
+     *
+     * @param $record_id
+     * @param $event_id
+     * @param $field_name
+     * @param $instance_id
+     * @param $file
+     */
+    public function uploadFile($record_id, $event_id, $field_name, $instance_id, $file) {
+        $project_id = $this->framework->getProjectId();
+
+        //Uplolad file into edocs folder, return edoc_id, and unlinks tmp file
+        $doc_id = Files::uploadFile($file,$project_id);
+
+        $doc_name = trim(strip_tags(str_replace("'", "", html_entity_decode(stripslashes($file['name']), ENT_QUOTES))));
+        if ($doc_name == "") {
+            $doc_id = 0;
+        }
+
+        // Update data table with $doc_id value
+
+        //EXAMPLE: select 1 from redcap_data WHERE record = '16' and project_id = 263 and event_id = '1821' and instance is null limit 1
+
+        $sql_1 = sprintf("select 1 from redcap_data WHERE record = '%s' and project_id = $project_id 
+					   and event_id = '%d' and instance ".($instance_id == '1' ? "is null" : "= '%d'")." limit 1",
+                         db_escape($record_id),
+                         db_escape($event_id),
+                         db_escape($instance_id)
+        );
+
+        //$this->emDebug("SQL1: ".$sql_1);
+        $q = db_query($sql_1);
+
+        // Record exists. Now see if field has had a previous value. If so, update; if not, insert.
+        $fileFieldValueExists = (db_num_rows($q) > 0);
+        if ($fileFieldValueExists) {
+
+            //EXAMPLE: UPDATE redcap_data SET value = '1534' WHERE record = '16' AND field_name = 'st_citi_file' AND project_id = 263 and instance is null
+
+            $sql_2 = sprintf("UPDATE redcap_data SET value = '$doc_id' WHERE record = '%s' AND field_name = '%s' 
+					  AND project_id = $project_id and instance ".($instance_id == '1' ? "is null" : "= '%d'"),
+                             db_escape($record_id),
+                             db_escape($field_name),
+                             db_escape($event_id),
+                             db_escape($instance_id)
+            );
+
+            //$this->emDebug("SQL2: ".$sql_2);
+            $q2 = db_query($sql_2);
+
+
+            if (db_affected_rows($q2) == 0) {
+                // Insert since update failed
+                //EXAMPLE: SQL3: INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES (263, 1821, '16', 'st_citi_file', 1534,NULL)
+
+                $sql_3 = sprintf("INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) 
+						  VALUES ($project_id, %d, '%s', '%s', %d,".($instance_id == '1' ? "NULL" : '%d').")",
+                                 db_escape($event_id),
+                                 db_escape($record_id),
+                                 db_escape($field_name),
+                                 db_escape($doc_id),
+                                 db_escape($instance_id)
+                );
+
+                //$this->emDebug("SQL3: ".$sql_3);
+                $q3 = db_query($sql_3);
+
+            }
+
+            //log to REDCap logging
+            REDCap::logEvent(
+                "File uploaded from learner portal by CROP EM",  //action
+                "$doc_name uplaoded to record $record_id in instance $instance_id",  //changes
+                NULL, //sql optional
+                $record_id, //record optional
+                $event_id, //event optional
+                $this->project_id //project ID optional
+            );
+
+            return true;
+        } else {
+            return false;  //return error message??
+        }
+        //TODO elseif (!$fileFieldValueExists && !$auto_inc_set): record is not saved yet. This should never happen; instance should always be saved first.
+
+    }
+
+
+    public function getUploadedFileName($edoc_id) {
+        //lookup the edoc file name in the redcap_edocs_metadata table
+        $q = db_query("select doc_name from redcap_edocs_metadata where doc_id = ".db_escape($edoc_id));
+        return db_result($q,0);
+
+    }
+
+    /**
      * Change request: 7/22
      * They want to be able to change the exam dates
      * @param $instance
@@ -986,7 +1083,9 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
             if ($field == "st_citi_file") {
                 if (!empty($field_value)) {
                     //a file has already been uploaded
-                    $upload_inst = "File already uploaded. Choose file to upload another file.";
+                    //get the file name
+                    $file_name = $this->getUploadedFileName($field_value);
+                    $upload_inst = "'$file_name' is already uploaded. You can replace this by doing another upload.";
                 } else {
                     $upload_inst = "File not yet uploaded.";
                 }

@@ -117,47 +117,35 @@ if (isset($_FILES['file'])) {
     //hard code field name to ct_
     $field_name = 'st_citi_file';
 
-    $edoc_id = $module->saveFile($_FILES['file']['tmp_name']);
+    $doc_size = $_FILES['file']['size'];
 
-    $upload_data = array(
-        $field_name => $edoc_id
-    );
-
-    //This doesn't seem to work
-    //$save_status = $rf->saveInstance($record, $upload_data, $last_instance, $exam_event);
-
-    $data = array(
-        REDCap::getRecordIdField() => $record,
-        'redcap_event_name' => REDCap::getEventNames(true, false, $exam_event),
-        'redcap_repeat_instance' => $last_instance,
-        //$field_name => $edoc_id,
-        'st_citi_file' => $edoc_id,
-        'st_oncore_comments' => "HELLO23". $edoc_id . " , " . $field_name
-    );
-
-    //save the data
-    $save_status = REDCap::saveData('json', json_encode(array($data)));
-
-    if ($save_status == false) {
-        $module->emDebug("Error saving : ". $rf->last_error_message);
+    if (($doc_size/1024/1024) > maxUploadSizeEdoc()  && $_FILES['myfile']['error'] != UPLOAD_ERR_OK) {
         $result = array(
             'result' => 'fail',
-            'msg' => 'There was an error uploading the file Please notify your admin.'
+            'msg' => 'ERROR: CANNOT UPLOAD FILE!\\n\\nThe uploaded file is ".round_up($doc_size/1024/1024)." MB in size, '+
+                'thus exceeding the maximum file size limit of ".maxUploadSizeEdoc()." MB.'
         );
+        // Delete temp file
+        unlink($_FILES['myfile']['tmp_name']);
     } else {
-        $module->emDebug("Success saving : ". $rf->last_error_message);
-        REDCap::logEvent(
-            "File uploaded by CROP EM",  //action
-            "Success uploading file $file_name to field $field_name.", //change msg
-            NULL, //sql optional
-            $record, //record optional
-            $exam_event, //event optional
-            $module->getProjectId() //project ID optional
-        );
-        $result = array(
-            'result' => 'success',
-            'msg' => 'Your file has been uploaded. Verification process can be started once all dates are entered.'
-        );
+
+        //$save_status = $module->uploadFile($record, $exam_event, $field_name, $last_instance,  $_FILES['file']['tmp_name']);
+        $save_status = $module->uploadFile($record, $exam_event, $field_name, $last_instance, $_FILES['file']);
+
+        if ($save_status == false) {
+            $module->emDebug("Error saving : " . $rf->last_error_message);
+            $result = array(
+                'result' => 'fail',
+                'msg' => 'There was an error uploading the file Please notify your admin.'
+            );
+        } else {
+            $module->emDebug("Success saving : " . $rf->last_error_message);
+
+            $result = array(
+                'result' => 'success',
+                'msg' => 'Your file has been uploaded. Verification process can be started once all dates are entered.'
+            );
+        }
     }
 
     header('Content-Type: application/json');

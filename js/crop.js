@@ -60,7 +60,8 @@
             contentType: false,  // tell jQuery not to set contentType
             success : function(data) {
                 console.log(data);
-                alert(data);
+                alert(data.msg);
+                location.reload();
             }
         })
     };
