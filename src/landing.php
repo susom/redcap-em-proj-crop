@@ -10,7 +10,7 @@ use REDCap;
 $module->emDebug("Starting CROP landing page for project $pid");
 
 $sunet_id = $_SERVER['WEBAUTH_USER'];
-//$sunet_id = 'umlaut';
+//$sunet_id = 'toto';
 
 //if sunet ID not set leave
 if (!isset($sunet_id)) {
@@ -42,6 +42,7 @@ if ($cert_mode) {
 }
 $cert_start      = $dem_array["cert_start"];
 $cert_end        = $dem_array["cert_end"];
+$cert_end_6_month = $module->getOffsetDate($cert_end, -180);
 
 $module->emDebug("Record is $record / status is $cert_mode ");
 

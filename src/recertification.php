@@ -67,7 +67,11 @@ namespace Stanford\ProjCROP;
             <button type="submit" id="save_form" class="btn btn-primary" value="true">Save Form</button>
             <br>
             <hr>
+            <?php if (new DateTime() < new DateTime($cert_end_6_month)) { ?>
+            Submissions will be accepted after <?php echo $cert_end_6_month ?>.
+            <?php } else {?>
             <button type="submit" id="recertify" class="btn btn-primary" value="true">Ready to Validate Recertification</button>
+            <?php }?>
         </form>
     </div>
     </body>
