@@ -125,7 +125,7 @@ class RepeatingForms
 
     }
 
-    public static function byForm($pid, $instrument_name) {
+    public static function byForm($pid, $instrument_name, $event_id) {
 
         if (empty($instrument_name)) {
             $instance->last_error_message = "Form $instrument_name is not valid in this project";
@@ -150,6 +150,8 @@ class RepeatingForms
         // If this is not longitudinal, retrieve the event_id
         if (!$instance->is_longitudinal) {
             $instance->event_id = array_keys($instance->Proj->eventInfo)[0];
+        } else {
+            $instance->event_id = $event_id;
         }
 
         // Is this instrument a survey
@@ -428,16 +430,19 @@ class RepeatingForms
      * @param null $event_id
      * @return int | false (If an error occurs)
      */
-    public function getLastInstanceId($record_id, $event_id=null) {
+    public function getLastInstanceId($record_id, $event_id=null)
+    {
         global $module;
 
+        if (is_null($event_id)) {
         //$module->emDebug("Location last instance id for record $record_id and event $event_id");
         if ($this->is_longitudinal && is_null($event_id)) {
             $this->last_error_message = "You must supply an event_id for longitudinal projects in " . __FUNCTION__;
             //$module->emError($this->last_error_message);
             return false;
         } else if (!$this->is_longitudinal) {
-            $event_id = $this->event_id;
+            $event_id = $this->event_id;  //this won't use passed in event_id if longitudinal???
+        }
         }
 
         // Check to see if we have the correct data loaded.
@@ -514,12 +519,76 @@ class RepeatingForms
     public function getNextInstanceId($record_id, $event_id=null) {
         global $module;
 
-        // If this is a longitudinal project, the event_id must be supplied.
-        if ($this->is_longitudinal && is_null($event_id)) {
-            $this->last_error_message = "You must supply an event_id for longitudinal projects in " . __FUNCTION__;
-            return false;
-        } else if (!$this->is_longitudinal) {
-            $event_id = $this->event_id;
+
+        if (is_null($event_id)) {
+            // If this is a longitudinal project, the event_id must be supplied.
+            if ($this->is_longitudinal && is_null($event_id)) {
+                $this->last_error_message = "You must supply an event_id for longitudinal projects in " . __FUNCTION__;
+                return false;
+            } else if (!$this->is_longitudinal) {
+                $event_id = $this->event_id;  //this_event_id seems to be null
+            }
+        }
+
+        // Find the last instance and add 1 to it. If there are no current instances, return 1.
+        $last_index = $this->getLastInstanceId($record_id, $event_id);
+
+        if (is_null($last_index)) {
+            return 1;
+        } else {
+            return ++$last_index;
+        }
+    }
+
+    public function getNextInstanceIdForForm($record_id, $form, $event_id=null) {
+        global $module;
+
+        //using sql as  loadData way does not seem to work.
+        // get the greatest instance id for the current configID
+        $sql = sprintf("
+            select
+               rd.record, max(instance) as 'max_instance'
+            from
+                redcap_data rd
+            where
+                rd.record = '%s'
+            and rd.event_id = %d
+            and rd.project_id = %d
+            and rd.field_name = '%s'",
+                       db_escape($record_id),
+                       db_escape($event_id),
+                       $module->getProjectId(),
+                       db_escape($form . "_complete")
+        );
+        $module->emDebug($sql);
+        $q = db_query($sql);
+
+        if ($row=db_fetch_assoc($q)) {
+            $instance = empty( $row['max_instance'] ) ? 0 : $row['max_instance'];
+
+            //max instance will be returned empty if n= 1 OR n=0
+            //so check the existence of $row['record'] to determine if 0 or 1
+            if (($instance == 0) && $row['record'] == $record_id) {
+                $module->emDebug("found 1 row, next instance should be 2");
+                $instance = 1;
+            }
+        } else {
+            $instance = 0;
+        }
+        $result = $instance +1;
+        $module->emDebug("Returning instance $result");
+        return $result;
+
+
+
+        if (is_null($event_id)) {
+            // If this is a longitudinal project, the event_id must be supplied.
+            if ($this->is_longitudinal && is_null($event_id)) {
+                $this->last_error_message = "You must supply an event_id for longitudinal projects in " . __FUNCTION__;
+                return false;
+            } else if (!$this->is_longitudinal) {
+                $event_id = $this->event_id;  //this_event_id seems to be null
+            }
         }
 
         // Find the last instance and add 1 to it. If there are no current instances, return 1.

@@ -888,11 +888,78 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
         //$module->emDebug($filter, $params, $records, $q);
 
+
+
         //return ($records[0][REDCap::getRecordIdField()]);
         return ($records[0]);
 
     }
 
+    function getAnnualUrl($record, $event_name, $repeat_instance, $year) {
+        //check if the url has been started before
+        if ($year == '2') {
+            $url_field = $this->getProjectSetting('ann-survey-url-2-field');
+            $date_stamp_field = $this->getProjectSetting('ann-survey-timestamp-2-field');
+        } else {
+            $url_field = $this->getProjectSetting('ann-survey-url-1-field');
+            $date_stamp_field = $this->getProjectSetting('ann-survey-timestamp-1-field');
+        }
+
+        $params = array(
+            'return_format'          => 'json',
+            'records'                => array($record),
+            'events'                 =>  $event_name,
+            'redcap_repeat_instance' => $repeat_instance,     //Adding parameter here does NOT seem to limit the getData to this instance
+            'fields'                 => array( REDCap::getRecordIdField(), $url_field)
+        );
+
+        $q = REDCap::getData($params);
+        $records = json_decode($q, true);
+
+        $target_url = null;
+
+        //Adding redcap_repeat_instance in getData  does NOT seem to limit the getData to this instance
+        foreach ($records as $cand) {
+            if ($cand['redcap_repeat_instance'] == $repeat_instance) {
+
+                $target_url = $cand[$url_field];
+                continue;
+            }
+        }
+
+        //no url saved so get the url
+        if (empty($target_url)) {
+
+            $target_form = $this->getProjectSetting('annual-survey-form');
+            $main_event = $this->getProjectSetting('application-event');
+            $rf = RepeatingForms::byForm($this->getProjectId(), $target_form, $main_event);
+
+            //get the next instance of the annual survey form
+            $next_instance = $rf->getNextInstanceIdForForm($record, $target_form,$main_event);
+
+            $target_url =  $rf->getSurveyUrl($record,$next_instance);
+            $this->emDebug("next _instance is $next_instance", $url);
+
+//save the url and timestamp in the admin form for the current instance
+//alert will add to logging
+//get today's date
+            $today = new DateTime();
+            $today_str = $today->format('Y-m-d H:i:s');
+
+            $save_data = array(
+                'record_id'                           => $record,
+                'redcap_event_name'                   => $event_name,
+                'redcap_repeat_instance'              => $repeat_instance,
+                $url_field                            => $target_url,
+                $date_stamp_field                     => $today_str
+            );
+
+            $status = REDCap::saveData('json', json_encode(array($save_data)));
+
+        }
+
+        return $target_url;
+    }
 
     /*******************************************************************************************************************/
     /* LEARNER PORTAL  METHODS                                                                                                      */
