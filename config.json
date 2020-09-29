@@ -153,8 +153,8 @@
 			"type": "form-list"
 		},
 		{
-			"key": "fup-survey-form",
-			"name": "<b>FUP Survey Form</b><br>Select form that is used for Followup Surveys",
+			"key": "annual-survey-form",
+			"name": "<b>Annual Survey Form</b><br>Select form that is used for Annual Surveys",
 			"required": false,
 			"type": "form-list"
 		},
@@ -207,18 +207,6 @@
 			"type": "field-list"
 		},
 		{
-			"key": "fup-survey-url-1-field",
-			"name": "<b>First Followup Survey URL field</b><br>Select field for the first followup survey url",
-			"required": false,
-			"type": "field-list"
-		},
-		{
-			"key": "fup-survey-url-2-field",
-			"name": "<b>Second Followup Date field</b><br>Select field for the second followup survey url",
-			"required": false,
-			"type": "field-list"
-		},
-		{
 			"key": "rem-expiry-6-mo-field",
 			"name": "<b>Six Month Expiry Reminder Date Field</b><br>Select field for the 6 month expiry reminder date",
 			"required": false,
@@ -233,6 +221,36 @@
 		{
 			"key": "grace-pd-30-day-field",
 			"name": "<b>30 Day Grace Period Date Field</b><br>Select field for the 30 day Grace Period date",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "ann-survey-desc",
+			"name": "<div class='alert alert-success'><h3 class='text-center'>Settings for Annual Surveys</h3><br>Fields use to log timestamps and URLs of annual surveys sent</div>",
+			"required": false,
+			"type": "descriptive"
+		},
+		{
+			"key": "ann-survey-url-1-field",
+			"name": "<b>First Annual Survey URL field</b><br>Select field for the first Annual survey url",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "ann-survey-url-2-field",
+			"name": "<b>Second Annual Survey URL field</b><br>Select field for the second Annual survey url",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "ann-survey-timestamp-1-field",
+			"name": "<b>First Annual Survey Timestamp field</b><br>Select field for the first Annual timestamp field",
+			"required": false,
+			"type": "field-list"
+		},
+		{
+			"key": "ann-survey-timestamp-2-field",
+			"name": "<b>Second Annual Survey Timestamp field</b><br>Select field for the second Annual timestamp field",
 			"required": false,
 			"type": "field-list"
 		},
