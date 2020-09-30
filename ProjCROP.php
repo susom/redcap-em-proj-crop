@@ -629,13 +629,10 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         $q = REDCap::getData($params);
         $records = json_decode($q, true);
 
-        $this->emDebug($filter, $params, $records, $q);
-
         //alert->sendNotification needs an event (of triggering event??)
-        $repeat_event = $this->getProjectSetting('exam-event');
-        $trigger_form = $this->getProjectSetting('admin-review-form');
-        $date_exam_field = $this->getProjectSetting('date-exam-1-field');
-        $mode_field      = $this->getProjectSetting('certify-recertify-mode-field');
+        $repeat_event    = $this->framework->getProjectSetting('exam-event');
+        $trigger_form    = $this->framework->getProjectSetting('admin-review-form');
+        $mode_field      = $this->framework->getProjectSetting('certify-recertify-mode-field');
 
         //create the REDCap Alerts class to pass on sendAlert method
         $alerts = new Alerts();
@@ -647,7 +644,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
             $record_id = $record['record_id'];
 
             //send them the notification for "ExpirationLetter"
-            $this->sendAlert( $record[REDCap::getRecordIdField()], $repeat_event, $trigger_form, "ExpirationLetter", $alerts);
+            $this->sendAlert($record[REDCap::getRecordIdField()], $repeat_event, $trigger_form, "TEMPLATE_ExpirationLetter", $alerts);
 
             //create a new instance
             $last_instance_id = $rf->getLastInstanceId($record_id, $repeat_event);
@@ -664,14 +661,18 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
                 if ($last_instance[$status_field] == '1') {
                     //STATUS IS PASS
 
+                    //this is unlikely transition.  This step is mostly likely handled with
+                    //change triggered in Admin Review Form
+
+                    $recertify_status_field      = 'recertify_status';
+
                     /**   RESET TO RECERTIFY */
-                    $this->emDebug("MODE IS RECERTIFICATION and STATUS was passed!  Proceed to create new instance; next id is $next_id");
-                    $this->resetInstanceToRecertify($record_id, $repeat_event, $next_id, $last_instance[$date_exam_field]);
+                    $this->emDebug("EXPIRY CHECK: MODE IS RECERTIFICATION and STATUS was passed!  Proceed to create new recertify instance; next instance id is $next_id");
+                    $this->resetInstanceToRecertify($record_id, $repeat_event, $next_id, $last_instance[$recertify_status_field]);
                 } else {
                     //STATUS IS FAIL or NOT SET
-
                     /**   RESET TO CERTIFY - START FROM SCRATCH*/
-                    $this->emDebug("MODE IS CERTIFICATION and STATUS was failed!  Proceed to create new instance; next id is $next_id");
+                    $this->emDebug("EXPIRY CHECK: MODE IS RECERTIFICATION and STATUS was failed!  Proceed to create new certify instance; next instance id is $next_id");
                     $this->resetInstanceToCertify($record_id, $repeat_event, $next_id);
                 }
 
@@ -682,6 +683,9 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
     }
 
     /**
+     *
+     * REPLACED BY checkExpirationGracePeriod since no state change till after grace period
+     *
      * Check records where today is the date of expiry and mode is  Recertifications
      * If recertify Verification status ('recertify_status') IS PASS, then create a new instance to Recertification
      *
@@ -701,7 +705,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         $today = new DateTime();
         $today_str = $today->format('Y-m-d');
 
-        //find records where the 30 day grace period ends today
+        //find records where certification ends today
         $filter = $event_filter_str . "[" . $cert_end . "] = '$today_str'";
 
         //add the filter to check that the $cert_mode is in recertification
@@ -724,7 +728,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
         $rf = RepeatingForms::byEvent($this->getProjectId(), $repeat_event);
 
-        //iterate through these records (with today as grace period expiration and in recertification mode)
+        //iterate through these records (with today as expiration and in recertification mode)
         foreach ($records as $record) {
 
             $record_id = $record['record_id'];
