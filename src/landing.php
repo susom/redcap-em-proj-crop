@@ -10,7 +10,7 @@ use REDCap;
 $module->emDebug("Starting CROP landing page for project $pid");
 
 $sunet_id = $_SERVER['WEBAUTH_USER'];
-$sunet_id = 'soda';
+$sunet_id = 'test';//'soda';
 
 //if sunet ID not set leave
 if (!isset($sunet_id)) {
