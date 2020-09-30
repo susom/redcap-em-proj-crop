@@ -267,6 +267,12 @@
 			"type": "text"
 		},
 		{
+			"key": "template-schedule-exam-learner",
+			"name": "Email Template - Name of Alert that exam is being scheduled sent to learner",
+			"required": false,
+			"type": "text"
+		},
+		{
 			"key": "template-seminar-incomplete",
 			"name": "Email Template - Name of Alert to notify learner that seminar form is incomplete",
 			"required": false,

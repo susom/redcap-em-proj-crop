@@ -157,18 +157,51 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
 
     /**
-     * Email triggered by the learner from the portal (verification request for Certification form)
-     * Sending template alert when the learner requests Verification after completing the Recertification form
-     *
-     * @param $record
-     * @param $event_id
-     * @param $repeat_instance
-     */
+ * Email triggered by the learner from the portal (verification request for Certification form)
+ * Sending template alert when the learner requests Verification after completing the Recertification form
+ *
+ * @param $record
+ * @param $event_id
+ * @param $repeat_instance
+ */
     public function sendAdminVerifyEmail($record, $event_id, $repeat_instance) {
         $this->emDebug("in sendAdminVerifyEmail");
 
         $alert_title = $this->framework->getProjectSetting("template-schedule-exam"); //"ScheduleExam";     // alert template title
         $check_date_field =  $this->framework->getProjectSetting("certify-request-sent-timestamp-field"); //"ts_ready_exam_notify");  // field to log date when email sent
+
+        //fields to update after send
+        $log_update_array = array(
+            'record_id'                               => $record,
+            'redcap_event_name'                       => REDCap::getEventNames(true, false,$this->framework->getProjectSetting('exam-event')),
+            'redcap_repeat_instance'                  => $repeat_instance
+            //$ts_ready_exam_notify_field               => $today_str, //set timestamp to today    //set in sendTemplateAlert
+            //$last_alert_template_sent_field           => $alert_title //update the alertsent field  //set in sendTemplateAlert
+        );
+
+        //todo: unclear what instrument the Alerts method is requiring ? triggering instrument???
+        $instrument = $this->framework->getProjectSetting('training-survey-form');
+        $this->sendTemplateAlert($record, $event_id, $repeat_instance, $instrument, $alert_title, $check_date_field, $log_update_array);
+    }
+
+    /**
+     * Email triggered by the learner from the portal (verification request for Certification form)
+     * Sending template alert when the learner requests Verification after completing the Recertification form
+     * CHANGEREQUEST: Sept 2020: Learner gets an email too
+     *
+     * @param $record
+     * @param $event_id
+     * @param $repeat_instance
+     */
+    public function sendLearnerVerifyEmail($record, $event_id, $repeat_instance) {
+        $this->emDebug("in sendLearnerVerifyEmail");
+
+        $alert_title = $this->framework->getProjectSetting("template-schedule-exam-learner"); //"ScheduleExamLearner";     // alert template title
+
+        //For learner IGNORE the multiple send for current
+        //$check_date_field =  $this->framework->getProjectSetting("certify-request-sent-timestamp-field"); //"ts_ready_exam_notify");  // field to log date when email sent
+        $check_date_field = '';
+
 
         //fields to update after send
         $log_update_array = array(
