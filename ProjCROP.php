@@ -113,7 +113,6 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         // IN latest instance
         //if mode is certification (empty or 0) && exam passed, then create a new instance
         if (($last_instance[$mode_field]!='1') && $last_instance[$exam_status_field] == '1') {
-
             $next_id = $rf->getNextInstanceId($record, $repeat_event);
             $this->emDebug("Record=$record : MODE IS CERTIFICATION and EXAM STATUS was passed!  Proceed to create new instance; next id is $next_id");
             $this->resetInstanceToRecertify($record, $repeat_event, $next_id, $last_instance[$date_exam_field]);
@@ -645,7 +644,6 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
             $record_id = $record['record_id'];
 
             //send them the notification for "ExpirationLetter"
-            $template = $this->framework->getProjectSetting('template-expiration-letter');
             $this->sendAlert($record[REDCap::getRecordIdField()], $repeat_event, $trigger_form, "TEMPLATE_ExpirationLetter", $alerts);
 
             //create a new instance
