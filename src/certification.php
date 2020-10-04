@@ -66,21 +66,29 @@ $last_name = "Szeto";
 <script>
 $(document).ready(function(){
     // Add Completed Count?    
-    var count_dates = $("#seminar_update_form").find(".input-group").length;
-    var count_files = $("#seminar_update_form").find(".file_uploaded_status").length;
-    var date_hasval = 0;
-    $("#seminar_update_form").find(".input-group :input").each(function(){
-        if($(this).val()){
+    function checkCompleted(){
+        var count_dates = $("#seminar_update_form").find(".input-group").length;
+        var count_files = $("#seminar_update_form").find(".file_uploaded_status").length;
+        var date_hasval = 0;
+        $("#seminar_update_form").find(".input-group :input").each(function(){
+            if($(this).val()){
+                date_hasval++;
+            }
+        });
+        if($("#seminar_update_form").find(".file_uploaded_status").text() != "File not yet uploaded."){
             date_hasval++;
         }
-    });
-    if($("#seminar_update_form").find(".file_uploaded_status").text() != "File not yet uploaded."){
-        date_hasval++;
-    }
 
-    $("#total_certs").text(count_dates+count_files);
-    $("#completed_certs").text(date_hasval);
-    $(".header-global b").fadeIn("medium");
+        $("#total_certs").text(count_dates+count_files);
+        $("#completed_certs").text(date_hasval);
+        $(".header-global b").fadeIn("medium");
+    }
+    
+    checkCompleted();
+
+    $("#seminar_update_form").find(".input-group :input").change(function(){
+        checkCompleted();
+    });
 })
 </script>
 </body>

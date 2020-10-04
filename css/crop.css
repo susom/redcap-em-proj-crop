@@ -57,18 +57,19 @@ header.header-global{
 #seminar_update_form thead th{
     background: #8c1515;
     color:#fff;
-}
-#seminar_update_form thead th{
     border-radius:0 5px 0 0;
 }
 #seminar_update_form thead th:first-child{
     border-radius:5px 0 0 0;
+    padding-left:30px;
+    padding-right:0;
 }
-#seminar_update_form thead th:first-child,
+
 #seminar_update_form tbody td:first-child{
     padding-left:30px;
     padding-right:0;
     font-weight:bold;
+    line-height: 250%;
 }
 #seminar_update_form thead th,
 #seminar_update_form tbody td{
