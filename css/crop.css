@@ -1,3 +1,92 @@
 select.form-control {
     display:inline-block
 }
+
+header.header-global{
+    background-color: #000000;
+    margin-bottom:60px;
+}
+
+.header-global nav a.som-logo{
+    background: url(https://med.stanford.edu/etc/clientlibs/sm/mauna-kea/images/SM-Logo.svg) no-repeat #ffffff center center;
+    border-right: none;
+    text-indent: -9999px;
+    display: inline-block;
+    width: 200px;
+    width: 14.285714285714286rem;
+    height: 60px;
+    height: 4.285714285714286rem;
+    background-size: 78%;
+}
+
+.header-global b{
+    float: right;
+    display: inline-block;
+    line-height: 440%;
+    color: #fff;
+    margin-right: 25px;
+    display:none;
+}
+
+
+
+#seminar_update_form .table th,
+#seminar_update_form .table td{
+    border:none;
+}
+
+.btns {
+    border-top:1px solid #ccc;
+    margin:20px 25px ; padding:20px 0;
+    text-align:center;
+}
+
+#seminar_update_form{
+    border: 1px solid #ccc;
+    border-radius: 5px;
+
+    background:#f0f4f5;
+}
+
+#seminar_update_form .col-md-12{
+    padding-left:0;
+    padding-right:0;
+
+}
+
+#seminar_update_form thead th{
+    background: #8c1515;
+    color:#fff;
+}
+#seminar_update_form thead th{
+    border-radius:0 5px 0 0;
+}
+#seminar_update_form thead th:first-child{
+    border-radius:5px 0 0 0;
+}
+#seminar_update_form thead th:first-child,
+#seminar_update_form tbody td:first-child{
+    padding-left:30px;
+    padding-right:0;
+    font-weight:bold;
+}
+#seminar_update_form thead th,
+#seminar_update_form tbody td{
+    padding-right:30px;
+}
+
+.input-group>.custom-select:not(:last-child), .input-group>.form-control:not(:last-child) {
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+}
+#seminar_update_form .input-group{
+    width:30%;
+}
+
+.datepicker{
+    padding: 5px 10px;
+    color:#009ABB
+}
+.datepicker thead th{
+    color:#09425A;
+}

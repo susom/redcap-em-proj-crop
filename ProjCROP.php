@@ -1165,11 +1165,11 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
                     }
 
                     $field_choices .= "</select></div>";
-                    $field_label = "<div class='form-group col-md-8'>
+                    $field_label = "
                           <select id='{$field[0]}' class='form-control select'>
                                 {$field_choices}
                           </select>
-                      </div>";
+                      ";
                 }
 
                 //handle free text fields that aren't dates
@@ -1198,7 +1198,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
                     "</td>
                   <td>
 
-                    <span>{$upload_inst}</span>
+                    <span class='file_uploaded_status'>{$upload_inst}</span>
                   <div class='form-control upload'>                                      
                   <input type='file'   name='{$field}' id='{$field}' placeholder='{$upload_inst}'>
                   <input type='submit' name='upload_file' id='upload_file' data_field='{$field}' value='Upload File'>
