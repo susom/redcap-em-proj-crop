@@ -2,8 +2,8 @@
 namespace Stanford\ProjCROP;
 /** @var \Stanford\ProjCROP\ProjCROP $module */
 
-$first_name = "Irvin";
-$last_name = "Szeto";
+// $first_name = "Irvin";
+// $last_name = "Szeto";
 
 ?>
 <!DOCTYPE html>

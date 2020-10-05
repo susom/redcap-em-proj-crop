@@ -10,12 +10,12 @@ use REDCap;
 $module->emDebug("Starting CROP landing page for project $pid");
 
 $sunet_id = $_SERVER['WEBAUTH_USER'];
-$sunet_id = 'soda';
-$debug    = true; 
+// $sunet_id = 'soda';
+$debug    = false; 
 
 
 //if sunet ID not set leave
-if (!isset($sunet_id) && !$debug) {
+if (!isset($sunet_id)) {
     die("SUNet ID was not available. Please webauth in and try again!");
 }
 
@@ -25,7 +25,7 @@ if (!isset($sunet_id) && !$debug) {
 //2. If exists,
 $dem_array = $module->findRecordFromSUNet($sunet_id, $module->getProjectSetting('application-event'));
 
-if (!isset($dem_array) && !$debug) {
+if (!isset($dem_array)) {
     die("Record was not found for $sunet_id. Please contact CROP admin.");
 }
 
