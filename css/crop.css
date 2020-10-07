@@ -12,11 +12,11 @@ header.header-global{
     border-right: none;
     text-indent: -9999px;
     display: inline-block;
-    width: 200px;
-    width: 14.285714285714286rem;
+    width: 300px;
+    /* width: 14.285714285714286rem; */
     height: 60px;
     height: 4.285714285714286rem;
-    background-size: 78%;
+    background-size: 90%;
 }
 
 .header-global b{
@@ -30,6 +30,8 @@ header.header-global{
 
 
 
+#recert_forms .table th, 
+#recert_forms .table td, 
 #seminar_update_form .table th,
 #seminar_update_form .table td{
     border:none;
@@ -39,8 +41,10 @@ header.header-global{
     border-top:1px solid #ccc;
     margin:20px 25px ; padding:20px 0;
     text-align:center;
+    overflow:hidden;
 }
 
+#recert_forms,
 #seminar_update_form{
     border: 1px solid #ccc;
     border-radius: 5px;
@@ -48,16 +52,21 @@ header.header-global{
     background:#f0f4f5;
 }
 
+#recert_forms .col-md-12,
 #seminar_update_form .col-md-12{
     padding-left:0;
     padding-right:0;
 
 }
 
+#recert_forms thead th,
 #seminar_update_form thead th{
     background: #8c1515;
     color:#fff;
     border-radius:0 5px 0 0;
+}
+#recert_forms thead th{
+    border-radius:0;
 }
 #seminar_update_form thead th:first-child{
     border-radius:5px 0 0 0;
@@ -90,4 +99,10 @@ header.header-global{
 }
 .datepicker thead th{
     color:#09425A;
+}
+
+
+#recert_forms h4{
+    background: #AABEC6;
+    color:#333;
 }

@@ -2,9 +2,6 @@
 namespace Stanford\ProjCROP;
 /** @var \Stanford\ProjCROP\ProjCROP $module */
 
-// $first_name = "Irvin";
-// $last_name = "Szeto";
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -19,6 +16,11 @@ namespace Stanford\ProjCROP;
 <script type="text/javascript" src="https://cdn.datatables.net/v/dt/dt-1.10.20/datatables.min.js"></script>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.4.1/js/bootstrap-datepicker.min.js"></script>
 <script type='text/javascript' src='<?php echo $module->getUrl("js/crop.js")?>'></script>
+<style>
+.header-global nav a.som-logo{
+    background-image:url(<?=$module->getUrl("img/web_logo.png")?>);
+}
+</style>
 </head>
 <body>
 <header class="header-global">
