@@ -11,11 +11,11 @@ $module->emDebug("Starting CROP landing page for project $pid");
 
 $sunet_id = $_SERVER['WEBAUTH_USER'];
 // $sunet_id = 'soda';
-$debug    = false; 
+$debug    = true;
 
 
 //if sunet ID not set leave
-if (!isset($sunet_id)) {
+if (!isset($sunet_id) && !$debug) {
     die("SUNet ID was not available. Please webauth in and try again!");
 }
 
@@ -25,7 +25,7 @@ if (!isset($sunet_id)) {
 //2. If exists,
 $dem_array = $module->findRecordFromSUNet($sunet_id, $module->getProjectSetting('application-event'));
 
-if (!isset($dem_array)) {
+if (!isset($dem_array) && !$debug) {
     die("Record was not found for $sunet_id. Please contact CROP admin.");
 }
 
@@ -80,6 +80,10 @@ if (isset($_POST['schedule'])) {
     $save_status = $rf->saveInstance($record, $save_data, $last_instance, $exam_event);
 
     $module->sendAdminVerifyEmail($record, $exam_event, $last_instance);
+
+    //change request: Also send the learner notification that exam is about to be scheduled
+    $module->sendLearnerVerifyEmail($record, $exam_event, $last_instance);
+
     $result = array(
         'result' => 'success',
         'msg' => 'Verification has been started. You will be contacted soon on its status.'
@@ -228,7 +232,7 @@ if (isset($_POST['save_form'])) {
 }
 
 
-if ($recertify === true) {
+if ($recertify === true ) {
     // RENDERING THE SUMMARY PAGE WITH TABLE
     include("recertification.php");
 } else {

@@ -1229,23 +1229,23 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
 
     public function getRecertificationGenInfo($instance) {
-        $htm = '<div class="form-row">
-            <div class="form-group col-md-6"><h6>Have you changed positions since certification?</h6>
+        $htm = '<div class="form-row col-md-5 row">
+            <div class="form-group col-md-8"><h6>Have you changed positions since certification?</h6>
             </div>
-            <div class="form-group col-md-6">';
-        $htm .= '<label><input name="rf_position_change" id="rf_position_change" type="radio" value="1" ';
+            <div class="form-group col-md-4">';
+        $htm .= '<label class="d-block mb-0"><input name="rf_position_change" id="rf_position_change" type="radio" value="1" ';
         $htm .= $instance['rf_position_change'] == '1' ? 'checked="true" ' : '';
-        $htm .= '> Yes</label><br>';
+        $htm .= '> Yes</label> ';
         $htm .= '<label><input name="rf_position_change" id="rf_position_change" type="radio" value="0" ';
         $htm .= $instance['rf_position_change'] == '0' ? 'checked="true" ' : '';
         $htm .= '> No</label>
         </div>
         </div>';
 
-        $htm .= '<div class="form-row">
-            <div class="form-group col-md-6"><p>If yes, what was your title/department at initial certification date?</p>
+        $htm .= '<div class="form-row  col-md-5 row">
+            <div class="form-group col-md-9"><h6 class="pl-2">If yes, what was your title/department at initial certification date?</h6>
             </div>
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-3">
                 <input name="rf_title_at_cert" id="rf_title_at_cert" type="text" class="form-control elective" value="'.$instance['rf_title_at_cert'].'" autocomplete="off"/>
             </div>
         </div>';
