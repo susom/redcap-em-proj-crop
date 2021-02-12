@@ -8,6 +8,7 @@ use REDCap;
 use ExternalModules\ExternalModules;
 use Alerts;
 use Files;
+use Project;
 
 require_once 'emLoggerTrait.php';
 require_once 'src/RepeatingForms.php';
@@ -58,6 +59,8 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
     );
 
     var $alerts;
+
+    private $proj;
 
     /*******************************************************************************************************************/
     /* HOOK METHODS                                                                                                    */
@@ -886,8 +889,25 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         }
 
 
-    public function findRecordFromSUNet($id, $target_event = NULL) {
-        global $module;
+    /**
+     * This method will be called not in project context so need to make it standalone
+     * @param $pid
+     * @param $id
+     * @param null $target_event
+     * @return array|mixed
+     * @throws \Exception
+     */
+    public function findRecordFromSUNet($pid, $id, $target_event = NULL) {
+        global $module, $Proj;
+
+        if ($Proj->project_id == $pid) {
+            $this->proj = $Proj;
+        } else {
+            if ($this->proj->project_id != $pid) {
+                $this->proj =  new Project($pid);
+                $_GET['pid'] = $pid;
+            }
+        }
 
         //should this be parametrized?
         $target_id_field = "webauth_user";
@@ -905,18 +925,26 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
         //punt on this until it becomes longitudinal
         $event_filter_str = "";
-        if (REDCap::isLongitudinal()) {
-            $event_filter_str =  "[" . REDCap::getEventNames(true, false, $target_event) . "]";
-        }
 
+        //can't use this since not in project context
+//        if (REDCap::isLongitudinal()) {
+//            $event_filter_str =  "[" . REDCap::getEventNames(true, false, $target_event) . "]";
+//        }
+
+        if ($this->proj->longitudinal == true) {
+            $first_event_label   = $this->proj->firstEventName;
+            $first_event_name = lower(str_replace(' ', '_',$first_event_label)) . "_arm_1";
+            $event_filter_str =  "[" . $first_event_name . "]";
+        }
 
         $filter = $event_filter_str . "[" . $target_id_field . "] = '$id'";
 
         // Use alternative passing of parameters as an associate array
         $params = array(
+            'project_id'    => $pid,
             'return_format' => 'json',
             'events'        =>  $target_event,
-            'fields'        => array( REDCap::getRecordIdField(), $firstname_field, $lastname_field, $cert_mode, $cert_start, $cert_end),
+            'fields'        => array( $this->proj->table_pk, $firstname_field, $lastname_field, $cert_mode, $cert_start, $cert_end),
             'filterLogic'   => $filter
         );
 
@@ -975,7 +1003,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
             $next_instance = $rf->getNextInstanceIdForForm($record, $target_form,$main_event);
 
             $target_url =  $rf->getSurveyUrl($record,$next_instance);
-            $this->emDebug("next _instance is $next_instance", $url);
+            $this->emDebug("next _instance is $next_instance", $target_url);
 
 //save the url and timestamp in the admin form for the current instance
 //alert will add to logging
@@ -1012,8 +1040,8 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
      * @param $instance_id
      * @param $file
      */
-    public function uploadFile($record_id, $event_id, $field_name, $instance_id, $file) {
-        $project_id = $this->framework->getProjectId();
+    public function uploadFile($project_id, $record_id, $event_id, $field_name, $instance_id, $file) {
+        //$project_id = $this->framework->getProjectId();
 
         //Uplolad file into edocs folder, return edoc_id, and unlinks tmp file
         $doc_id = Files::uploadFile($file,$project_id);
@@ -1028,14 +1056,17 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         //EXAMPLE: select 1 from redcap_data WHERE record = '16' and project_id = 263 and event_id = '1821' and instance is null limit 1
 
         $sql_1 = sprintf("select 1 from redcap_data WHERE record = '%s' and project_id = $project_id 
-					   and event_id = '%d' and instance ".($instance_id == '1' ? "is null" : "= '%d'")." limit 1",
+					   and event_id = '%d' and field_name = '%s' and instance ".($instance_id == '1' ? "is null" : "= '%d'")." limit 1",
                          db_escape($record_id),
                          db_escape($event_id),
+                         db_escape($field_name),
                          db_escape($instance_id)
         );
 
         //$this->emDebug("SQL1: ".$sql_1);
         $q = db_query($sql_1);
+
+        $status = false;
 
         // Record exists. Now see if field has had a previous value. If so, update; if not, insert.
         $fileFieldValueExists = (db_num_rows($q) > 0);
@@ -1053,7 +1084,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
             //$this->emDebug("SQL2: ".$sql_2);
             $q2 = db_query($sql_2);
-
+            if ($q2== true) $status = true;
 
             if (db_affected_rows($q2) == 0) {
                 // Insert since update failed
@@ -1070,9 +1101,28 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
                 //$this->emDebug("SQL3: ".$sql_3);
                 $q3 = db_query($sql_3);
-
+                if ($q3== true) $status = true;
             }
 
+            //return true;
+        } else {
+            //fieldValue does not exist yet
+            $sql_3 = sprintf("INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) 
+						  VALUES ($project_id, %d, '%s', '%s', %d,".($instance_id == '1' ? "NULL" : '%d').")",
+                             db_escape($event_id),
+                             db_escape($record_id),
+                             db_escape($field_name),
+                             db_escape($doc_id),
+                             db_escape($instance_id)
+            );
+
+            //$this->emDebug("SQL3: ".$sql_3);
+            $q3 = db_query($sql_3);
+            if ($q3 == true) $status = true;
+            //return true;  //return error message??
+        }
+
+        if ($status) {
             //log to REDCap logging
             REDCap::logEvent(
                 "File uploaded from learner portal by CROP EM",  //action
@@ -1080,12 +1130,10 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
                 NULL, //sql optional
                 $record_id, //record optional
                 $event_id, //event optional
-                $this->project_id //project ID optional
+                $project_id //project ID optional
             );
 
             return true;
-        } else {
-            return false;  //return error message??
         }
         //TODO elseif (!$fileFieldValueExists && !$auto_inc_set): record is not saved yet. This should never happen; instance should always be saved first.
 

@@ -6,28 +6,36 @@ namespace Stanford\ProjCROP;
 require_once("RepeatingForms.php");
 
 use REDCap;
+use Project;
 
 $module->emDebug("Starting CROP landing page for project $pid");
 
 $sunet_id = $_SERVER['WEBAUTH_USER'];
-// $sunet_id = 'soda';
+//$sunet_id = 'cookie';
+
+ //We need endpoint for a webauthed user who is not a REDCap project user
+//Use different parameter for PID: 'projectId', and then pass that project id to all the methods
+//since we won't have project context.
+$pid = $_GET['projectId'] ? $_GET['projectId']: $_GET['pid'];
+$_GET['pid']=$pid;
+
+$proj =  new Project($pid);
 
 //if sunet ID not set leave
 if (!isset($sunet_id)) {
     die("SUNet ID was not available. Please webauth in and try again!");
 }
 
-//$module->emDebug($_POST);
 //look up the sunet id in the project and present the available status in the data table.
 //1. if none, create new form
 //2. If exists,
-$dem_array = $module->findRecordFromSUNet($sunet_id, $module->getProjectSetting('application-event'));
+$dem_array = $module->findRecordFromSUNet($pid, $sunet_id, $module->getProjectSetting('application-event'));
 
 if (!isset($dem_array)) {
     die("Record was not found for $sunet_id. Please contact CROP admin.");
 }
 
-$record = $dem_array[REDCap::getRecordIdField()];
+$record = $dem_array[$proj->table_pk];
 
 //$module->emDebug($dem_array, $record);
 
@@ -113,7 +121,7 @@ if (isset($_POST['schedule'])) {
 }
 
 if (isset($_FILES['file'])) {
-    $module->emDebug("Handling upload file");
+    $module->emDebug("Uploading file");
     //todo: ask about checking files
     $file = fopen($_FILES['file']['tmp_name'], 'r');
     $file_name = $_FILES['file']['name'];
@@ -135,7 +143,7 @@ if (isset($_FILES['file'])) {
     } else {
 
         //$save_status = $module->uploadFile($record, $exam_event, $field_name, $last_instance,  $_FILES['file']['tmp_name']);
-        $save_status = $module->uploadFile($record, $exam_event, $field_name, $last_instance, $_FILES['file']);
+        $save_status = $module->uploadFile($pid, $record, $exam_event, $field_name, $last_instance, $_FILES['file']);
 
         if ($save_status == false) {
             $module->emDebug("Error saving : " . $rf->last_error_message);
