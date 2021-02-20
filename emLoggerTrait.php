@@ -1,6 +1,6 @@
 <?php
 namespace Stanford\ProjCROP;
-/** @var \Stanford\RepeatingSurveyPortal\RepeatingSurveyPortal $this */
+/** @var \Stanford\ProjCROP\ProjCROP $this */
 
 
 /**

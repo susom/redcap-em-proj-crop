@@ -871,6 +871,24 @@ class RepeatingForms
         }
 
         $url = REDCap::getSurveyLink($record, $this->instrument, $this->event_id, $instance_id, $this->pid);
+        return $url;    }
+
+    /**
+     * Obtain the survey url for this instance of the form
+     * @param $record
+     * @param $instance_id
+     * @return string|null
+     */
+    public function getSurveyUrlForInstrument($pid, $record, $instance_id, $instrument, $event_id) {
+
+        $is_survey = isset($this->Proj->forms[$instrument]["survey_id"]);
+        // Make sure the instrument is a survey
+        if(!$is_survey) {
+            $this->last_error_message = "This instrument is not a survey";
+            return null;
+        }
+
+        $url = REDCap::getSurveyLink($record, $instrument, $event_id, $instance_id, $pid);
         return $url;
     }
 

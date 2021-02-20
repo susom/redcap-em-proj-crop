@@ -18,7 +18,8 @@
 	],
 
 	"permissions": [
-		"redcap_save_record"
+		"redcap_save_record",
+		"redcap_survey_complete"
 	],
 
 	"crons": [
@@ -105,12 +106,6 @@
 			"type": "field-list"
 		},
 		{
-			"key": "recertify-request-sent-timestamp-field",
-			"name": "<b>LEARNER: Date stamp of recertification request sent</b><br>Select Field to log timestamp of last recertification request from learner. Field in Admin Review form (ex: rf_ts_recertify_notify",
-			"required": false,
-			"type": "field-list"
-		},
-		{
 			"key": "form-desc",
 			"name": "<div class='alert alert-success'><h3 class='text-center'>FORMS</h3><br>Select Events and Forms used</div>",
 			"required": false,
@@ -143,12 +138,6 @@
 		{
 			"key": "admin-review-form",
 			"name": "<b>Admin Review Form</b><br>Select Form for admin review",
-			"required": false,
-			"type": "form-list"
-		},
-		{
-			"key": "exam-date-form",
-			"name": "<b>Exam Form</b><br>Select Form where exam dates are saved",
 			"required": false,
 			"type": "form-list"
 		},

@@ -17,47 +17,6 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
     use emLoggerTrait;
 
-    //These are the fields to be displayed for the certification form
-    //TODO: convert this to use the EM config
-    var $portal_fields = array(
-        "st_date_hipaa",
-        "st_date_citi",
-        "st_citi_file",
-        "st_date_clin_trials",
-        "st_date_ethics",
-        "st_date_irb_report",
-        "st_date_doc",
-        "st_date_resources",
-        "st_date_consent",
-        "st_date_irb",
-        "st_date_budgeting",
-        "st_date_billing",
-        "st_date_regulatory",
-        "st_date_startup",
-        "st_date_roles",
-        "st_date_rsrch_phase",
-        array("st_oncore","st_date_oncore"),
-        array("elective_1","elective_1_date"),
-        array("elective_2", "elective_2_date"),
-        array("elective_3","elective_3_date"),
-        array("elective_4", "elective_4_date")
-    );
-
-    var $recert_fields = array(
-        "rf_date_ethics",
-        "rf_date_hipaa",
-        array("rf_core_1_date", "rf_core_1_sponsor", "rf_core_1_title"),
-        array("rf_core_2_date", "rf_core_2_sponsor", "rf_core_2_title"),
-        array("rf_core_3_date", "rf_core_3_sponsor", "rf_core_3_title"),
-        array("rf_class_1_date", "rf_class_1_sponsor", "rf_class_1_title"),
-        array("rf_class_2_date", "rf_class_2_sponsor", "rf_class_2_title"),
-        array("rf_class_3_date", "rf_class_3_sponsor", "rf_class_3_title"),
-        array("rf_class_4_date", "rf_class_4_sponsor", "rf_class_4_title"),
-        array("rf_class_5_date", "rf_class_5_sponsor", "rf_class_5_title"),
-        array("rf_class_6_date", "rf_class_6_sponsor", "rf_class_6_title"),
-        array("rf_class_7_date", "rf_class_7_sponsor", "rf_class_7_title")
-    );
-
     var $alerts;
 
     private $proj;
@@ -70,12 +29,15 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
         //
         $this->emDebug("Just saved $instrument in instance $repeat_instance");
 
+
         //on save of admin_review form, trigger email to admin to verify the training
         //or Reset to new event instance
         if ($instrument == $this->framework->getProjectSetting('admin-review-form')) {
             $this->checkExamAndReset($record, $event_id, $repeat_instance);
             $this->sendLearnerStatusEmail($record, $event_id, $repeat_instance);
         }
+
+
     }
 
     /**
@@ -151,6 +113,30 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
      */
     public function redcap_survey_complete($project_id, $record, $instrument, $event_id, $group_id,  $survey_hash,  $response_id,  $repeat_instance) {
         $this->emDebug("$instrument just completed as survey");
+
+
+        $exam_event = $this->framework->getProjectSetting('exam-event');
+        $last_instance = $repeat_instance;
+
+        //on save of seminar form form, trigger email to admin to verify the training
+        //or Reset to new event instance
+        if ($instrument == $this->framework->getProjectSetting('training-survey-form')) {
+            $this->sendAdminVerifyEmail($record, $exam_event, $last_instance);
+
+            //change request: Also send the learner notification that exam is about to be scheduled
+            $this->sendLearnerVerifyEmail($record, $exam_event, $last_instance);
+        }
+
+        //on save of recertify form form, trigger email to admin to verify the recertification
+        //or Reset to new event instance
+        if ($instrument == $this->framework->getProjectSetting('recertification-form')) {
+            //if verification checkbox is checked, then send Admin form to verify
+
+            $this->sendAdminVerifyRecertificationEmail($record, $exam_event, $last_instance);
+
+            //TODO: Also send the learner notification that recertification is about to verified
+            //$this->sendLearnerVerifyEmail($record, $exam_event, $last_instance);
+        }
     }
 
     /*******************************************************************************************************************/
@@ -749,8 +735,17 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
 
         /*******************************************************************************************************************/
-        /* EM HELPER METHODS                                                                                                      */
+        /* EM HELPER METHODS                                                                                               */
         /***************************************************************************************************************** */
+
+    /**
+     * Rediret to this url
+     *
+     * @param $url
+     */
+    function redirect($url) {
+        header("Location: " . $url);
+    }
 
     /**
      * Helper method to create a new instance in Recertification mode
@@ -779,7 +774,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
             'redcap_event_name'                                           => REDCap::getEventNames(true, false, $repeat_event),
             'redcap_repeat_instance'                                      => $next_id,
             $this->getProjectSetting('certify-recertify-mode-field') => 1, //recertify mode
-            $this->getProjectSetting('final-exam-date-field')        => $exam_date,
+            $this->getProjectSetting('recertify-start-date-field')   => $exam_date,
             $this->getProjectSetting('expiry-date-field')     => $expiry_date,
             $this->getProjectSetting('fup-survey-6-mo-field') => $this->getOffsetDate($exam_date, 180),
             $this->getProjectSetting('fup-survey-1-yr-field') => $this->getOffsetDate($exam_date, 365),
@@ -1025,383 +1020,5 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
 
         return $target_url;
     }
-
-    /*******************************************************************************************************************/
-    /* LEARNER PORTAL  METHODS                                                                                                      */
-    /***************************************************************************************************************** */
-
-
-    /**
-     * Cribbed from file_upload.php
-     *
-     * @param $record_id
-     * @param $event_id
-     * @param $field_name
-     * @param $instance_id
-     * @param $file
-     */
-    public function uploadFile($project_id, $record_id, $event_id, $field_name, $instance_id, $file) {
-        //$project_id = $this->framework->getProjectId();
-
-        //Uplolad file into edocs folder, return edoc_id, and unlinks tmp file
-        $doc_id = Files::uploadFile($file,$project_id);
-
-        $doc_name = trim(strip_tags(str_replace("'", "", html_entity_decode(stripslashes($file['name']), ENT_QUOTES))));
-        if ($doc_name == "") {
-            $doc_id = 0;
-        }
-
-        // Update data table with $doc_id value
-
-        //EXAMPLE: select 1 from redcap_data WHERE record = '16' and project_id = 263 and event_id = '1821' and instance is null limit 1
-
-        $sql_1 = sprintf("select 1 from redcap_data WHERE record = '%s' and project_id = $project_id 
-					   and event_id = '%d' and field_name = '%s' and instance ".($instance_id == '1' ? "is null" : "= '%d'")." limit 1",
-                         db_escape($record_id),
-                         db_escape($event_id),
-                         db_escape($field_name),
-                         db_escape($instance_id)
-        );
-
-        //$this->emDebug("SQL1: ".$sql_1);
-        $q = db_query($sql_1);
-
-        $status = false;
-
-        // Record exists. Now see if field has had a previous value. If so, update; if not, insert.
-        $fileFieldValueExists = (db_num_rows($q) > 0);
-        if ($fileFieldValueExists) {
-
-            //EXAMPLE: UPDATE redcap_data SET value = '1534' WHERE record = '16' AND field_name = 'st_citi_file' AND project_id = 263 and instance is null
-
-            $sql_2 = sprintf("UPDATE redcap_data SET value = '$doc_id' WHERE record = '%s' AND field_name = '%s' 
-					  AND project_id = $project_id and instance ".($instance_id == '1' ? "is null" : "= '%d'"),
-                             db_escape($record_id),
-                             db_escape($field_name),
-                             db_escape($event_id),
-                             db_escape($instance_id)
-            );
-
-            //$this->emDebug("SQL2: ".$sql_2);
-            $q2 = db_query($sql_2);
-            if ($q2== true) $status = true;
-
-            if (db_affected_rows($q2) == 0) {
-                // Insert since update failed
-                //EXAMPLE: SQL3: INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES (263, 1821, '16', 'st_citi_file', 1534,NULL)
-
-                $sql_3 = sprintf("INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) 
-						  VALUES ($project_id, %d, '%s', '%s', %d,".($instance_id == '1' ? "NULL" : '%d').")",
-                                 db_escape($event_id),
-                                 db_escape($record_id),
-                                 db_escape($field_name),
-                                 db_escape($doc_id),
-                                 db_escape($instance_id)
-                );
-
-                //$this->emDebug("SQL3: ".$sql_3);
-                $q3 = db_query($sql_3);
-                if ($q3== true) $status = true;
-            }
-
-            //return true;
-        } else {
-            //fieldValue does not exist yet
-            $sql_3 = sprintf("INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) 
-						  VALUES ($project_id, %d, '%s', '%s', %d,".($instance_id == '1' ? "NULL" : '%d').")",
-                             db_escape($event_id),
-                             db_escape($record_id),
-                             db_escape($field_name),
-                             db_escape($doc_id),
-                             db_escape($instance_id)
-            );
-
-            //$this->emDebug("SQL3: ".$sql_3);
-            $q3 = db_query($sql_3);
-            if ($q3 == true) $status = true;
-            //return true;  //return error message??
-        }
-
-        if ($status) {
-            //log to REDCap logging
-            REDCap::logEvent(
-                "File uploaded from learner portal by CROP EM",  //action
-                "$doc_name uplaoded to record $record_id in instance $instance_id",  //changes
-                NULL, //sql optional
-                $record_id, //record optional
-                $event_id, //event optional
-                $project_id //project ID optional
-            );
-
-            return true;
-        }
-        //TODO elseif (!$fileFieldValueExists && !$auto_inc_set): record is not saved yet. This should never happen; instance should always be saved first.
-
-    }
-
-
-    public function getUploadedFileName($edoc_id) {
-        //lookup the edoc file name in the redcap_edocs_metadata table
-        $q = db_query("select doc_name from redcap_edocs_metadata where doc_id = ".db_escape($edoc_id));
-        return db_result($q,0);
-
-    }
-
-    /**
-     * Change request: 7/22
-     * They want to be able to change the exam dates
-     * @param $instance
-     */
-    public function getExamDates($instance) {
-        $instrument = 'seminars_trainings';
-        $htm = '';
-
-        $dict = REDCap::getDataDictionary($this->getProjectId(),'array', false, null, $instrument);
-        $selections_str = $dict['st_requested_exam']['select_choices_or_calculations'];
-        $selections = explode("|", $selections_str);
-        foreach ($selections as $str) {
-            $val = explode(",", $str);
-            $htm .= "<option value='{$val[0]}'> {$val[1]} </option>";
-        }
-        return $htm;
-    }
-
-    /**
-     * Get the data from the seminar / trainings and render as table
-     *
-     * @param $instance
-     * @return string
-     * @throws \Exception
-     */
-    public function getLatestSeminars($instance) {
-        $instrument = 'seminars_trainings';
-        $htm  = '';
-
-        $dict = REDCap::getDataDictionary($this->getProjectId(),'array', false, null, $instrument);
-        //$this->emDebug($instance);
-
-        foreach ($this->portal_fields as $field) {
-            $field_type = null;
-
-
-            if (!is_array($field)) {
-                $field_label = $dict[$field]['field_label'];
-                $field_type = $dict[$field]['field_type'];
-                $field_value = $instance[$field];
-                $field_id = $field;
-            } else {
-
-                $field_label = $dict[$field[0]]['field_label'];
-                $field_type = $dict[$field[0]]['field_type'];
-
-                $field_value = $instance[$field[1]];
-                $field_id = $field[1];
-
-                if ($field_type === 'dropdown') {
-
-                    $selected = trim($instance[$field[0]]);
-
-                    $default_selected_display = $selected == '' ? 'selected disabled' : '';
-                    //$this->emDebug("SELECTED? $field[0] :  " . $selected . " : " . ($selected == ''). " :display=> ". $default_selected_display);
-
-                    $field_choices = "<option value='' {$default_selected_display}>{$field_label}</option>";
-                    foreach (explode("|", $dict[$field[0]]['select_choices_or_calculations']) as $choice) {
-                        $choice_parts = explode(",", $choice);
-                        $choice_selected_display = ($selected == $choice_parts[0]) ? 'selected' : '';
-                        //$this->emDebug("SELECTED?  :  " . $choice_parts[0] . " : " . ($selected == $choice_parts[0]). " :display=> ". $choice_selected_display);
-                        $field_choices .= "<option value='{$choice_parts[0]}'  {$choice_selected_display}>{$choice_parts[1]}</option>";
-                    }
-
-                    $field_choices .= "</select></div>";
-                    $field_label = "
-                          <select id='{$field[0]}' class='form-control select'>
-                                {$field_choices}
-                          </select>
-                      ";
-                }
-
-                //handle free text fields that aren't dates
-                //if (($dict[$field]['field_type'] == 'text') && ($dict[$field]['text_validation_type_or_show_slider_number'] !== 'date_ymd')) {
-                if (($field_type == 'text') && (strpos($field[0], 'elective_') === 0)) {
-
-                    //$field_elective_label = substr($field[0], 0, -5);
-                    $field_elective_value = $instance[$field[0]];
-                    $field_label = "<input id='{$field[0]}' type='text' class='form-control elective' value='{$field_elective_value}' placeholder='Please enter {$field_label}'/> ";
-                }
-
-            }
-
-            //change request: 7/22: add an file upload
-            if ($field == "st_citi_file") {
-                if (!empty($field_value)) {
-                    //a file has already been uploaded
-                    //get the file name
-                    $file_name = $this->getUploadedFileName($field_value);
-                    $upload_inst = "'$file_name' is already uploaded. You can replace this by doing another upload.";
-                } else {
-                    $upload_inst = "File not yet uploaded.";
-                }
-
-                $htm .= '<tr><td>' . $field_label .
-                    "</td>
-                  <td>
-
-                    <span class='file_uploaded_status'>{$upload_inst}</span>
-                  <div class='form-control upload'>                                      
-                  <input type='file'   name='{$field}' id='{$field}' placeholder='{$upload_inst}'>
-                  <input type='submit' name='upload_file' id='upload_file' data_field='{$field}' value='Upload File'>
-                  </div>
-                 
-                  </td>
-                  </tr>";
-
-            } else {
-                $htm .= '<tr><td>'
-                    . $field_label .
-                    "</td>
-                  <td>
-                      <div class='input-group date'  >
-                          <input id='{$field_id}' type='text' class='form-control dt' value='{$field_value}' placeholder='yyyy-mm-dd'/>
-                          <span class='input-group-addon'>
-                               <span class='glyphicon glyphicon-calendar'></span>
-                           </span>
-                      </div>
-                  </td>
-              </tr>";
-            }
-        }
-
-        return $htm;
-    }
-
-
-
-    public function getRecertificationGenInfo($instance) {
-        $htm = '<div class="form-row col-md-5 row">
-            <div class="form-group col-md-8"><h6>Have you changed positions since certification?</h6>
-            </div>
-            <div class="form-group col-md-4">';
-        $htm .= '<label class="d-block mb-0"><input name="rf_position_change" id="rf_position_change" type="radio" value="1" ';
-        $htm .= $instance['rf_position_change'] == '1' ? 'checked="true" ' : '';
-        $htm .= '> Yes</label> ';
-        $htm .= '<label><input name="rf_position_change" id="rf_position_change" type="radio" value="0" ';
-        $htm .= $instance['rf_position_change'] == '0' ? 'checked="true" ' : '';
-        $htm .= '> No</label>
-        </div>
-        </div>';
-
-        $htm .= '<div class="form-row  col-md-5 row">
-            <div class="form-group col-md-9"><h6 class="pl-2">If yes, what was your title/department at initial certification date?</h6>
-            </div>
-            <div class="form-group col-md-3">
-                <input name="rf_title_at_cert" id="rf_title_at_cert" type="text" class="form-control elective" value="'.$instance['rf_title_at_cert'].'" autocomplete="off"/>
-            </div>
-        </div>';
-
-        return $htm;
-    }
-
-    /**
-     *
-     * Formats the learner's record for display on the learner portal for the recertification stage
-     * Get the data from the recertification and render as table
-     *
-     * @param $instance
-     * @return string
-     * @throws \Exception
-     */
-    public function getRecertification($instance) {
-        $instrument = 'recertification_form';
-        $htm  = '';
-
-        $dict = REDCap::getDataDictionary($this->getProjectId(),'array', false, null, $instrument);
-        //$this->emDebug($instance);
-
-        foreach ($this->recert_fields as $field) {
-
-            //if array, then it is date - sponsor - class
-            if (!is_array($field)) {
-                $field_date_value = $instance[$field];
-                $field_date_id = $field;
-                $field_sponsor = (strpos($field, 'ethics') !== false) ? 'RCO' :'Privacy';
-                $field_class = $dict[$field]['field_label'];
-            } else {
-                $field_date_value = $instance[$field[0]];
-                $field_date_id = $field[0];
-                $field_sponsor = "<input id='{$field[1]}' type='text' class='form-control elective' value='{$instance[$field[1]]}' placeholder='Please enter Sponsor'/> ";
-                $class_label = (strpos($field[2], 'core') !== false) ? 'CORE TITLE' :'CLASS TITLE';
-
-                $field_class = "<input id='{$field[2]}' type='text' class='form-control elective' value='{$instance[$field[2]]}' placeholder='{$class_label}'/> ";
-            }
-
-            //date - sponsor - class
-            $htm .= "<tr>".
-                "<td>
-                      <div class='input-group date'  >
-                          <input id='{$field_date_id}' type='text' class='form-control dt' value='{$field_date_value}' placeholder='yyyy-mm-dd'/>
-                          <span class='input-group-addon'>
-                               <span class='glyphicon glyphicon-calendar'></span>
-                           </span>
-                      </div>
-                  </td>".
-                "<td>"
-                .$field_sponsor.
-                "</td>".
-                "<td>"
-                .$field_class.
-                "</td>".
-              "</tr>";
-        }
-
-        return $htm;
-    }
-
-
-    /**
-     *
-     * @param $date
-     * @param $text
-     * @param $coded
-     * @return array
-     * @throws \Exception
-     */
-    public function setupSaveData($date, $text, $coded) {
-
-
-        $codedArray = array();
-        foreach ($coded as $field_name => $field_value) {
-            $codedArray[$field_name] = $field_value;
-        }
-
-        $textArray = array();
-        foreach ($text as $field_name => $field_value) {
-            $textArray[$field_name] = $field_value;
-        }
-
-        $dateArray = array();
-        foreach ($date as $field_name => $field_value) {
-            if (!empty($field_value)) {
-
-
-                if (strpos($field_name,'_date') !== false) {
-                    $date_cand = new \DateTime($field_value);
-                    $date_str = $date_cand->format('Y-m-d');
-
-                    $dateArray[$field_name] = $date_str;
-                } else {
-                    $textArray[$field_name] = $field_value;
-                }
-            }
-        }
-
-        $data = array_merge(
-            $codedArray,
-            $textArray,
-            $dateArray
-        );
-
-        return $data;
-    }
-
 
 }
