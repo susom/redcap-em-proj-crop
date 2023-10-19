@@ -10,8 +10,15 @@ use Project;
 
 
 
-$sunet_id = $_SERVER['WEBAUTH_USER'];
+$sunet_id_wu = $_SERVER['WEBAUTH_USER'];
+$module->emDebug("WEBAUTH user found is ". $sunet_id_wu);
+$sunet_id_ru = $_SERVER['REMOTE_USER'];
+$module->emDebug("REmote user found is ". $sunet_id_ru);
+//use framework method
+$sunet_id = $module->getUser()->getUsername();
+$module->emDebug("User username is ". $sunet_id);
 //$sunet_id = 'petunia';
+
 
  //We need endpoint for a webauthed user who is not a REDCap project user
 //Use different parameter for PID: 'projectId', and then pass that project id to all the methods
