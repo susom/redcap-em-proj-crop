@@ -10,7 +10,9 @@ use Project;
 
 
 
-$sunet_id = $_SERVER['WEBAUTH_USER'];
+//$sunet_id = $_SERVER['WEBAUTH_USER'];
+//use framework method
+$sunet_id = $module->getUser()->getUsername();
 //$sunet_id = 'petunia';
 
  //We need endpoint for a webauthed user who is not a REDCap project user
