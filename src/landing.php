@@ -19,7 +19,6 @@ $sunet_id = $module->getUser()->getUsername();
 $module->emDebug("User username is ". $sunet_id);
 //$sunet_id = 'petunia';
 
-
  //We need endpoint for a webauthed user who is not a REDCap project user
 //Use different parameter for PID: 'projectId', and then pass that project id to all the methods
 //since we won't have project context.
