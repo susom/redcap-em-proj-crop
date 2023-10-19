@@ -17,6 +17,9 @@ $module->emDebug("REmote user found is ". $sunet_id_ru);
 //use framework method
 $sunet_id = $module->getUser()->getUsername();
 $module->emDebug("User username is ". $sunet_id);
+//$sunet_id = $_SERVER['WEBAUTH_USER'];
+//use framework method
+$sunet_id = $module->getUser()->getUsername();
 //$sunet_id = 'petunia';
 
  //We need endpoint for a webauthed user who is not a REDCap project user
