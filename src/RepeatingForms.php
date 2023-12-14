@@ -545,16 +545,19 @@ class RepeatingForms
 
         //using sql as  loadData way does not seem to work.
         // get the greatest instance id for the current configID
+         $data_table = method_exists('\REDCap', 'getDataTable') ? \REDCap::getDataTable($module->getProjectId()) : "redcap_data";
+
         $sql = sprintf("
             select
                rd.record, max(instance) as 'max_instance'
             from
-                redcap_data rd
+                %s rd
             where
                 rd.record = '%s'
             and rd.event_id = %d
             and rd.project_id = %d
             and rd.field_name = '%s'",
+                       db_escape($data_table),
                        db_escape($record_id),
                        db_escape($event_id),
                        $module->getProjectId(),
@@ -671,10 +674,12 @@ class RepeatingForms
         $event_sql = "AND event_id IN ($event_id)";
         $event_sql_d = "AND d.event_id IN ($event_id)";
 
+        $data_table = method_exists('\REDCap', 'getDataTable') ? \REDCap::getDataTable($this->pid) : "redcap_data";
+
         // "Delete" edocs for 'file' field type data (keep its row in table so actual files can be deleted later from web server, if needed).
         // NOTE: If *somehow* another record has the same doc_id attached to it (not sure how this would happen), then do NOT
         // set the file to be deleted (hence the left join of d2).
-        $sql_all[] = $sql = "update redcap_metadata m, redcap_edocs_metadata e, redcap_data d left join redcap_data d2
+        $sql_all[] = $sql = "update redcap_metadata m, redcap_edocs_metadata e, $data_table d left join $data_table d2
 							on d2.project_id = d.project_id and d2.value = d.value and d2.field_name = d.field_name and d2.record != d.record
 							set e.delete_date = '".NOW."' where m.project_id = " . $this->pid . " and m.project_id = d.project_id
 							and e.project_id = m.project_id and m.element_type = 'file' and d.field_name = m.field_name
@@ -690,7 +695,8 @@ class RepeatingForms
 							and r.upload_doc_id = m.doc_id and m.delete_date is null";
         db_query($sql);
         // Delete record from data table
-        $sql_all[] = $sql = "DELETE FROM redcap_data WHERE project_id = " . $this->pid . " AND record = '" . $record_id . "' AND instance = " . $instance_id . " $event_sql";
+
+        $sql_all[] = $sql = "DELETE FROM $data_table WHERE project_id = " . $this->pid . " AND record = '" . $record_id . "' AND instance = " . $instance_id . " $event_sql";
         db_query($sql);
         $module->emLog("Deleted from redcap_data: " . $sql);
 
