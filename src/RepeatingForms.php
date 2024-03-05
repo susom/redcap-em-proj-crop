@@ -551,13 +551,12 @@ class RepeatingForms
             select
                rd.record, max(instance) as 'max_instance'
             from
-                %s rd
+                $data_table rd
             where
                 rd.record = '%s'
             and rd.event_id = %d
             and rd.project_id = %d
             and rd.field_name = '%s'",
-                       db_escape($data_table),
                        db_escape($record_id),
                        db_escape($event_id),
                        $module->getProjectId(),
