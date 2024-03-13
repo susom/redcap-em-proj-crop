@@ -454,7 +454,7 @@ class RepeatingForms
         //$module->emDebug("Longitudinal  is ". $this->is_longitudinal);
         // If the record_ids (and optionally event_ids) match, return the data.
         if ($this->is_longitudinal) {
-            $size = sizeof($this->data[$record_id][$event_id]);
+            $size = sizeof($this->data[$record_id][$event_id]?:[]);
 
             if ($size < 1) {
                 //todo ask lee ann: not an error? this will prompt return of 1 as first instance
