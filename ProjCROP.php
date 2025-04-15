@@ -543,7 +543,7 @@ class ProjCROP extends \ExternalModules\AbstractExternalModule {
             $last_alert_template_sent_field       => $template //set timestamp to today
         );
 
-        $data = array_merge($save_data, $extra_data);
+        $data = array_merge($save_data, $extra_data?:[]);
 
         $status = REDCap::saveData('json', json_encode(array($data)));
     }
